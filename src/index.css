@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f6f7fb;
+  --card: #ffffff;
+  --primary: #6366f1;
+  --muted: #6b7080;
+  --border: #e6e8f0;
+  --success: #10b981;
+}
+
+[data-theme="dark"] {
+  --bg: #09090b;
+  --card: #16171c;
+  --primary: #6366f1;
+  --muted: #9a9fb0;
+  --border: #262833;
+  --success: #10b981;
+}
+
+html, body {
+  overscroll-behavior-y: none;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  background-color: var(--bg);
+  min-height: 100%;
+}
