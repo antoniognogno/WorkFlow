@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
+import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Share2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -80,7 +80,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
     const lines = filteredEntries.map((e) => {
       const d = new Date(e.date + 'T12:00:00')
       const dayName = DAY_NAMES[d.getDay()]
-      const dateFormatted = d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
+      const dateFormatted = formatDateItalian(e.date)
       const hours = formatDuration(e.minutes)
       const euro = formatCurrency((e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate))
       const overtime = e.overtimeMinutes ? ` + ${formatDuration(e.overtimeMinutes)} extra` : ''
@@ -151,8 +151,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <span className="text-xs font-medium text-muted-foreground">
-            {new Date(startDate + 'T12:00:00').toLocaleDateString('it-IT')} –{' '}
-            {new Date(endDate + 'T12:00:00').toLocaleDateString('it-IT')}
+            {formatDateItalian(startDate)} – {formatDateItalian(endDate)}
           </span>
           <Button variant="outline" size="icon" className="h-8 w-8 rounded-lg" onClick={() => setOffset((o) => o + 1)}>
             <ChevronRight className="h-4 w-4" />
@@ -219,7 +218,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                 <div key={e.id} className="py-2.5 flex justify-between items-center text-xs">
                   <div>
                     <div className="font-semibold">
-                      {DAY_NAMES[d.getDay()]} {d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })}
+                      {DAY_NAMES[d.getDay()]} {formatDateItalian(e.date)}
                     </div>
                     <div className="text-muted-foreground text-[11px]">
                       {e.start}–{e.end} · {formatDuration(e.minutes)}{e.overtimeMinutes ? ` + ${formatDuration(e.overtimeMinutes)} extra` : ''} · {j.name}

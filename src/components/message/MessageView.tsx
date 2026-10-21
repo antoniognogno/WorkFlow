@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatDuration, DAY_NAMES } from '@/lib/utils'
+import { formatCurrency, formatDateItalian, formatDuration, DAY_NAMES } from '@/lib/utils'
 import { Copy, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -73,7 +73,7 @@ export const MessageView: React.FC<MessageViewProps> = ({ jobs, entries }) => {
       const d = new Date(e.date + 'T12:00:00')
       const j = getJob(e.jobId)
       const dayName = DAY_NAMES[d.getDay()]
-      const dateFormatted = d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' })
+      const dateFormatted = formatDateItalian(e.date)
       const hours = formatDuration(e.minutes)
       const euro = formatCurrency((e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate))
       const overtime = e.overtimeMinutes ? ` + ${formatDuration(e.overtimeMinutes)} extra` : ''
