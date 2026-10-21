@@ -33,7 +33,7 @@ export function AuthView() {
       <Card className="w-full max-w-sm">
         <CardContent className="space-y-4 p-5">
           <div>
-            <h1 className="text-xl font-bold">Ore &amp; Paga</h1>
+            <h1 className="text-xl font-bold">WorkFlow</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {isSignUp ? 'Crea il tuo account' : 'Accedi per ritrovare i tuoi dati'}
             </p>
