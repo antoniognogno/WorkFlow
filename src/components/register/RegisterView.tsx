@@ -43,6 +43,33 @@ interface RegisterViewProps {
 
 const emptyForm = { jobId: '', date: '', start: '16:00', end: '18:00', breakMinutes: '0', overtimeMinutes: '0' }
 
+const formatDateInput = (isoDate: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : isoDate
+}
+
+const normalizeDateInput = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 8) return null
+  const day = digits.slice(0, 2)
+  const month = digits.slice(2, 4)
+  const year = digits.slice(4)
+  const candidate = `${year}-${month}-${day}`
+  const parsed = new Date(`${candidate}T12:00:00`)
+  return parsed.getFullYear() === Number(year) && parsed.getMonth() + 1 === Number(month) && parsed.getDate() === Number(day)
+    ? candidate
+    : null
+}
+
+const normalizeTimeInput = (value: string) => {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 4) return null
+  const hours = digits.slice(0, 2)
+  const minutes = digits.slice(2)
+  if (Number(hours) > 23 || Number(minutes) > 59) return null
+  return `${hours}:${minutes}`
+}
+
 export const RegisterView: React.FC<RegisterViewProps> = ({
   jobs, entries, trashEntries, onAddEntry, onUpdateEntry, onDeleteEntry, onRestoreEntry, onPermanentlyDeleteEntry, onCreateJob,
 }) => {
@@ -56,6 +83,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [newJobRate, setNewJobRate] = useState('')
   const [newJobOvertime, setNewJobOvertime] = useState(false)
   const [newJobMultiplier, setNewJobMultiplier] = useState('1.5')
+  const [dateInput, setDateInput] = useState(formatDateInput(today))
   const selectedJob = jobs.find((job) => job.id === form.jobId)
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`)), [entries])
   const visibleEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5)
@@ -68,17 +96,22 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const updateForm = (key: keyof typeof form, value: string) => setForm((current) => ({ ...current, [key]: value }))
   const submitEntry = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!form.jobId || !form.date || calculateMinutes(form.start, form.end) <= 0) return
+    const date = normalizeDateInput(dateInput) ?? form.date
+    const start = normalizeTimeInput(form.start)
+    const end = normalizeTimeInput(form.end)
+    if (!form.jobId || !date || !start || !end || calculateMinutes(start, end) <= 0) return
     const breakMinutes = Math.max(0, Number(form.breakMinutes) || 0)
     const overtimeMinutes = Math.max(0, Number(form.overtimeMinutes) || 0)
-    if (editingId) await onUpdateEntry(editingId, form.jobId, form.date, form.start, form.end, breakMinutes, overtimeMinutes)
-    else await onAddEntry(form.jobId, form.date, form.start, form.end, breakMinutes, overtimeMinutes)
+    if (editingId) await onUpdateEntry(editingId, form.jobId, date, start, end, breakMinutes, overtimeMinutes)
+    else await onAddEntry(form.jobId, date, start, end, breakMinutes, overtimeMinutes)
     setEditingId(null)
     setForm({ ...emptyForm, jobId: form.jobId, date: today })
+    setDateInput(formatDateInput(today))
   }
   const startEdit = (entry: Entry) => {
     setEditingId(entry.id)
     setForm({ jobId: entry.jobId, date: entry.date, start: entry.start, end: entry.end, breakMinutes: String(entry.breakMinutes), overtimeMinutes: String(entry.overtimeMinutes) })
+    setDateInput(formatDateInput(entry.date))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
   const createJob = async (event: React.FormEvent) => {
@@ -114,8 +147,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
             <option value="">Scegli un lavoro</option>{jobs.map((job) => <option key={job.id} value={job.id}>{job.name} · {formatCurrency(job.rate)}/h</option>)}
           </select>
           <div className="grid grid-cols-2 gap-2">
-            <Input type="date" inputMode="numeric" value={form.date} onChange={(event) => updateForm('date', event.target.value)} required />
-            <div className="grid min-w-0 grid-cols-2 gap-2"><Input type="time" inputMode="numeric" value={form.start} onChange={(event) => updateForm('start', event.target.value)} required /><Input type="time" inputMode="numeric" value={form.end} onChange={(event) => updateForm('end', event.target.value)} required /></div>
+            <Input type="text" inputMode="numeric" autoComplete="off" placeholder="gg/mm/aaaa" aria-label="Data (giorno, mese, anno)" value={dateInput} onChange={(event) => setDateInput(event.target.value)} onBlur={() => { const normalized = normalizeDateInput(dateInput); if (normalized) { updateForm('date', normalized); setDateInput(formatDateInput(normalized)) } }} required />
+            <div className="grid min-w-0 grid-cols-2 gap-2"><Input type="text" inputMode="numeric" autoComplete="off" placeholder="Inizio (hh:mm)" aria-label="Orario di inizio" value={form.start} onChange={(event) => updateForm('start', event.target.value)} onBlur={() => { const normalized = normalizeTimeInput(form.start); if (normalized) updateForm('start', normalized) }} required /><Input type="text" inputMode="numeric" autoComplete="off" placeholder="Fine (hh:mm)" aria-label="Orario di fine" value={form.end} onChange={(event) => updateForm('end', event.target.value)} onBlur={() => { const normalized = normalizeTimeInput(form.end); if (normalized) updateForm('end', normalized) }} required /></div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <label className="text-xs text-muted-foreground">Pausa / riposo (min)<Input className="mt-1" inputMode="numeric" type="number" min="0" step="5" value={form.breakMinutes} onChange={(event) => updateForm('breakMinutes', event.target.value)} /></label>
