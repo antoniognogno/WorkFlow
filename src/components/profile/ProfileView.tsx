@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { UserRound, LogOut, Mail } from 'lucide-react'
+import { UserRound, LogOut, Mail, Heart } from 'lucide-react'
 import type { Theme } from '@/App'
 
 interface ProfileViewProps {
@@ -45,6 +45,9 @@ export function ProfileView({ email, theme, onThemeChange, onSignOut }: ProfileV
           </Button>
         </CardContent>
       </Card>
+      <p className="flex items-center justify-center gap-1.5 pb-2 text-xs text-muted-foreground">
+        Creato da Antonio con <Heart className="h-3.5 w-3.5 fill-rose-400 text-rose-400" aria-label="amore" /> per Anna
+      </p>
     </div>
   )
 }
