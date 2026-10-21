@@ -114,12 +114,14 @@ export const JobsView: React.FC<JobsViewProps> = ({ jobs, onCreateJob, onDeleteJ
             <div className="flex gap-2 items-center pt-1">
               <Input
                 type="time"
+                inputMode="numeric"
                 value={presetStarts[j.id] || '16:00'}
                 onChange={(e) => setPresetStarts({ ...presetStarts, [j.id]: e.target.value })}
                 className="h-8 text-xs px-2"
               />
               <Input
                 type="time"
+                inputMode="numeric"
                 value={presetEnds[j.id] || '18:00'}
                 onChange={(e) => setPresetEnds({ ...presetEnds, [j.id]: e.target.value })}
                 className="h-8 text-xs px-2"
@@ -145,12 +147,13 @@ export const JobsView: React.FC<JobsViewProps> = ({ jobs, onCreateJob, onDeleteJ
               <input type="checkbox" checked={overtimeEnabled} onChange={(e) => setOvertimeEnabled(e.target.checked)} />
               Straordinari pagati di più
               {overtimeEnabled && (
-                <Input className="ml-auto h-7 w-20 text-xs" type="number" min="1" step="0.1" value={overtimeMultiplier} onChange={(e) => setOvertimeMultiplier(e.target.value)} aria-label="Moltiplicatore straordinari" />
+                <Input className="ml-auto h-9 w-20 text-xs" inputMode="decimal" type="number" min="1" step="0.1" value={overtimeMultiplier} onChange={(e) => setOvertimeMultiplier(e.target.value)} aria-label="Moltiplicatore straordinari" />
               )}
             </label>
             <div className="flex gap-2">
               <Input
                 type="number"
+                inputMode="decimal"
                 step="0.5"
                 placeholder="Tariffa €/ora"
                 value={rate}

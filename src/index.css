@@ -101,6 +101,18 @@ body {
 
 button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+@media (max-width: 640px) {
+  input, textarea, select {
+    min-height: 2.75rem;
+    font-size: 16px !important;
+  }
+
+  button {
+    min-height: 2.75rem;
+  }
 }
 
 button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
