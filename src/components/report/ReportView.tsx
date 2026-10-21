@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Share2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
@@ -37,6 +38,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [filter, setFilter] = useState('all')
+  const [totalTemplate, setTotalTemplate] = useState(
+    localStorage.getItem('report_total_template') || 'Totale: {ore} = {euro}'
+  )
 
   const getRollingRange = (days: number): [string, string] => {
     const end = new Date()
@@ -86,7 +90,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       const overtime = e.overtimeMinutes ? ` + ${formatDuration(e.overtimeMinutes)} extra` : ''
       return `${dayName} ${dateFormatted}: ${e.start}–${e.end} (${hours}${overtime}) → ${euro}`
     })
-    return `${lines.join('\n')}\n\nTotale: ${formatDuration(totalMinutes)} = ${formatCurrency(totalPay)}`
+    const totalLine = totalTemplate
+      .replaceAll('{ore}', formatDuration(totalMinutes))
+      .replaceAll('{euro}', formatCurrency(totalPay))
+    return `${lines.join('\n')}\n\n${totalLine}`
   }
 
   const handleCopy = () => {
@@ -202,6 +209,27 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="space-y-2 p-4">
+          <label htmlFor="report-total-template" className="text-xs font-semibold text-muted-foreground">
+            Riga finale del report
+          </label>
+          <Input
+            id="report-total-template"
+            value={totalTemplate}
+            onChange={(event) => {
+              setTotalTemplate(event.target.value)
+              localStorage.setItem('report_total_template', event.target.value)
+            }}
+            placeholder="Totale: {ore} = {euro}"
+            aria-describedby="report-total-hint"
+          />
+          <p id="report-total-hint" className="text-[11px] text-muted-foreground">
+            Usa {'{ore}'} per le ore totali e {'{euro}'} per il compenso.
+          </p>
         </CardContent>
       </Card>
 
