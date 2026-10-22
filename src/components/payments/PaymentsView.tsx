@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange } from '@/lib/utils'
+import { formatCurrency, formatDateItalian, formatDateLongItalian, formatDuration, getPeriodRange } from '@/lib/utils'
 import { ArrowLeft, CalendarRange, CheckCircle2, ChevronDown, Pencil, ReceiptText, WalletCards } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 
@@ -128,7 +128,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
           <Select value={editPaymentMethod} onChange={setEditPaymentMethod} options={[{ value: '', label: 'Non specificato' }, { value: 'bonifico', label: 'Bonifico bancario' }, { value: 'contanti', label: 'Contanti' }, { value: 'carta', label: 'Carta' }, { value: 'paypal', label: 'PayPal' }, { value: 'altro', label: 'Altro' }]} />
           <input type="text" value={editPaymentNote} onChange={(event) => setEditPaymentNote(event.target.value)} placeholder="Nota o riferimento" className="select-modern" maxLength={120} aria-label="Nota pagamento modificata" />
           <div className="flex gap-2"><Button size="sm" onClick={() => void savePaymentEdit()}>Salva</Button><Button size="sm" variant="outline" onClick={() => setEditingPaymentId(null)}>Annulla</Button></div>
-        </div> : <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{getJob(entry.jobId)?.name ?? 'Lavoro'}{getJob(entry.jobId)?.client ? ` · ${getJob(entry.jobId)?.client}` : ''}</p><p className="text-[11px] text-muted-foreground">{entry.paidAt ? `Ricevuto il ${formatDateItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateItalian(entry.date)}`}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}{entry.paymentNote ? ` · ${entry.paymentNote}` : ''}</p></div>}
+        </div> : <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{getJob(entry.jobId)?.name ?? 'Lavoro'}{getJob(entry.jobId)?.client ? ` · ${getJob(entry.jobId)?.client}` : ''}</p><p className="text-[11px] text-muted-foreground">{entry.paidAt ? `Ricevuto il ${formatDateLongItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateLongItalian(entry.date)}`}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}{entry.paymentNote ? ` · ${entry.paymentNote}` : ''}</p></div>}
         {!isEditing && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => beginPaymentEdit(entry)} aria-label="Modifica dettagli pagamento"><Pencil className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setCancelPaymentId(entry.id); setCancelConfirmation('') }}>Annulla pagamento</Button></div>}
         <span className="text-sm font-bold text-success">{formatCurrency(amountFor(entry))}</span>
         {isCancelling && <div className="w-full rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-xs"><p className="font-semibold text-destructive">Le ore resteranno, ma questo importo tornerà tra quelli da ricevere.</p><p className="mt-1 text-muted-foreground">Scrivi esattamente <strong>Annulla</strong> per confermare.</p><input value={cancelConfirmation} onChange={(event) => setCancelConfirmation(event.target.value)} placeholder="Scrivi Annulla" className="select-modern mt-2" aria-label="Conferma annullamento pagamento" /><div className="mt-2 flex gap-2"><Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={cancelConfirmation !== 'Annulla'} onClick={() => void confirmPaymentCancellation()}>Conferma annullamento</Button><Button size="sm" variant="outline" onClick={() => setCancelPaymentId(null)}>Indietro</Button></div></div>}
@@ -329,7 +329,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
                       {jobEntries.map((entry) => (
                         <label key={entry.id} className="flex cursor-pointer items-center gap-3 border-b border-border/60 py-2.5 last:border-0">
                           <input type="checkbox" checked={selectedIds.includes(entry.id)} onChange={() => toggleEntry(entry.id)} className="h-4 w-4 accent-primary" />
-                          <span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{formatDateItalian(entry.date)} · {entry.start}–{entry.end}</span><span className="text-[11px] text-muted-foreground">{formatDuration(entry.minutes + entry.overtimeMinutes)}</span></span>
+                          <span className="min-w-0 flex-1"><span className="block text-xs font-semibold">{formatDateLongItalian(entry.date)} · {entry.start}–{entry.end}</span><span className="text-[11px] text-muted-foreground">{formatDuration(entry.minutes + entry.overtimeMinutes)}</span></span>
                           <span className="text-xs font-bold">{formatCurrency(amountFor(entry))}</span>
                         </label>
                       ))}

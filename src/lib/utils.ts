@@ -29,6 +29,12 @@ export const formatDateItalian = (date: string): string => {
   return parsed.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+export const formatDateLongItalian = (date: string): string => {
+  const parsed = new Date(`${date}T12:00:00`)
+  if (Number.isNaN(parsed.getTime())) return date
+  return parsed.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export const calculateMinutes = (start: string, end: string): number => {
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)

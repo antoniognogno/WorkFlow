@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { calculateMinutes, formatCurrency, formatDuration, getPeriodRange } from '@/lib/utils'
+import { calculateMinutes, formatCurrency, formatDateLongItalian, formatDuration, getPeriodRange } from '@/lib/utils'
 
 describe('time and money helpers', () => {
   it('calculates regular and overnight durations', () => {
@@ -10,6 +10,10 @@ describe('time and money helpers', () => {
   it('formats durations and euro amounts for the Italian locale', () => {
     expect(formatDuration(90)).toBe('1 h 30 min')
     expect(formatCurrency(15)).toContain('15,00')
+  })
+
+  it('formats payment dates as readable Italian dates', () => {
+    expect(formatDateLongItalian('2026-10-22')).toBe('22 ottobre 2026')
   })
 
   it('returns a complete Monday-to-Sunday week', () => {
