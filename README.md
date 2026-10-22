@@ -3,7 +3,7 @@
 ## English
 Why?
 
-Because I needed this app with these funciontality free.
+Because I needed this app (pwa) with these funciontality free.
 
 What is?
 WorkFlow is a mobile-first Progressive Web App for tracking working activities, calculating compensation, and managing payment status. It is designed for people who work recurring shifts or assignments for multiple clients and need a clear separation between jobs, work logs, reports, and received payments. 
