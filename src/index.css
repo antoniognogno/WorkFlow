@@ -41,11 +41,19 @@
 }
 
 html, body {
-  overscroll-behavior-y: none;
+  overscroll-behavior: none;
+  overflow-x: hidden;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   background-color: var(--bg);
   min-height: 100%;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 html { color-scheme: dark; }
