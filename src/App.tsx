@@ -8,6 +8,7 @@ import { ReportView } from '@/components/report/ReportView'
 import { JobsView } from '@/components/jobs/JobsView'
 import { MessageView } from '@/components/message/MessageView'
 import { ProfileView } from '@/components/profile/ProfileView'
+import { PaymentsView } from '@/components/payments/PaymentsView'
 import { Wifi, WifiOff } from 'lucide-react'
 
 export type Theme = 'dark' | 'light'
@@ -31,6 +32,9 @@ interface Entry {
   minutes: number
   rate: number
   paid: boolean
+  paidAt: string | null
+  paymentMethod: string | null
+  paymentNote: string | null
   breakMinutes: number
   overtimeMinutes: number
   overtimeRate: number
@@ -62,6 +66,9 @@ interface RemoteEntry {
   minutes: number
   rate: number
   paid: boolean
+  paid_at: string | null
+  payment_method: string | null
+  payment_note: string | null
   break_minutes: number
   overtime_minutes: number
   overtime_rate: number
@@ -124,7 +131,7 @@ export default function App() {
     const [jobsWithOvertime, presetsResult, entriesWithFeatures] = await Promise.all([
       supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier').order('name'),
       supabase.from('presets').select('id,job_id,start_time,end_time'),
-      supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,deleted_at').order('date', { ascending: false }),
+      supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,paid_at,payment_method,payment_note,deleted_at').order('date', { ascending: false }),
     ])
     let jobsData = (jobsWithOvertime.data ?? []) as RemoteJob[]
     let jobsError = jobsWithOvertime.error
@@ -137,7 +144,10 @@ export default function App() {
     let entriesError = entriesWithFeatures.error
     if (
       isMissingColumnError(entriesWithFeatures.error?.message, 'break_minutes') ||
-      isMissingColumnError(entriesWithFeatures.error?.message, 'deleted_at')
+      isMissingColumnError(entriesWithFeatures.error?.message, 'deleted_at') ||
+      isMissingColumnError(entriesWithFeatures.error?.message, 'paid_at') ||
+      isMissingColumnError(entriesWithFeatures.error?.message, 'payment_method') ||
+      isMissingColumnError(entriesWithFeatures.error?.message, 'payment_note')
     ) {
       const fallbackEntries = await supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,paid').order('date', { ascending: false })
       entriesData = (fallbackEntries.data ?? []) as RemoteEntry[]
@@ -162,7 +172,7 @@ export default function App() {
     })))
     const mappedEntries = entriesData.map((entry) => ({
       id: entry.id, jobId: entry.job_id, date: entry.date, start: entry.start_time.slice(0, 5), end: entry.end_time.slice(0, 5),
-      minutes: entry.minutes, rate: Number(entry.rate), paid: entry.paid, breakMinutes: entry.break_minutes ?? 0,
+      minutes: entry.minutes, rate: Number(entry.rate), paid: entry.paid, paidAt: entry.paid_at ?? null, paymentMethod: entry.payment_method ?? null, paymentNote: entry.payment_note ?? null, breakMinutes: entry.break_minutes ?? 0,
       overtimeMinutes: entry.overtime_minutes ?? 0, overtimeRate: Number(entry.overtime_rate ?? 0), deletedAt: entry.deleted_at,
     }))
     setEntries(mappedEntries.filter((entry) => !entry.deletedAt))
@@ -303,6 +313,28 @@ export default function App() {
     await loadData()
   }
 
+  const markEntriesPaid = async (ids: string[], paidDate: string, paymentMethod: string | null, paymentNote: string | null) => {
+    const uniqueIds = [...new Set(ids)].filter(Boolean)
+    if (uniqueIds.length === 0) return
+
+    const { error } = await supabase
+      .from('entries')
+      .update({ paid: true, paid_at: new Date(`${paidDate}T12:00:00`).toISOString(), payment_method: paymentMethod, payment_note: paymentNote })
+      .in('id', uniqueIds)
+
+    if (error) {
+      if (isMissingColumnError(error.message, 'paid_at') || isMissingColumnError(error.message, 'payment_method') || isMissingColumnError(error.message, 'payment_note')) {
+        toast.error('Dettagli pagamento non disponibili: esegui supabase/migration-payment-details.sql nel SQL Editor di Supabase.')
+        return
+      }
+      toast.error(error.message)
+      return
+    }
+
+    toast.success(`${uniqueIds.length} ${uniqueIds.length === 1 ? 'registrazione segnata' : 'registrazioni segnate'} come pagate`)
+    await loadData()
+  }
+
   return (
     <div className="flex min-h-screen flex-col justify-between bg-background text-foreground">
       <Toaster position="top-center" richColors />
@@ -323,9 +355,10 @@ export default function App() {
         {loading ? <p className="py-12 text-center text-sm text-muted-foreground">Caricamento dati…</p> : <>
           {currentTab === 'reg' && <RegisterView jobs={jobs} entries={entries} trashEntries={trashEntries} onAddEntry={addEntry} onUpdateEntry={updateEntry} onDeleteEntry={deleteEntry} onRestoreEntry={restoreEntry} onPermanentlyDeleteEntry={permanentlyDeleteEntry} onCreateJob={createJob} />}
           {currentTab === 'rep' && <ReportView jobs={jobs} entries={entries} />}
+          {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} theme={theme} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} />}
         </>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={setCurrentTab} />

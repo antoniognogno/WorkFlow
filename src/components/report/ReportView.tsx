@@ -23,6 +23,9 @@ interface Entry {
   rate: number
   overtimeMinutes: number
   overtimeRate: number
+  paid: boolean
+  paidAt: string | null
+  paymentMethod: string | null
 }
 
 interface ReportViewProps {
@@ -33,7 +36,7 @@ interface ReportViewProps {
 type Period = 'last7' | 'last30' | 'week' | 'month' | 'quarter' | 'semester' | 'year' | 'custom'
 
 export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
-  const [period, setPeriod] = useState<Period>('last7')
+  const [period, setPeriod] = useState<Period>('last30')
   const [offset, setOffset] = useState(0)
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -70,7 +73,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
 
   const totalMinutes = filteredEntries.reduce((acc, cur) => acc + cur.minutes + cur.overtimeMinutes, 0)
   const totalPay = filteredEntries.reduce((acc, cur) => acc + (cur.minutes / 60) * cur.rate + (cur.overtimeMinutes / 60) * (cur.overtimeRate || cur.rate), 0)
-
   // Ripartizione per lavoro/cliente
   const breakdown: Record<string, number> = {}
   filteredEntries.forEach((e) => {
@@ -244,7 +246,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               const d = new Date(e.date + 'T12:00:00')
               return (
                 <div key={e.id} className="py-2.5 flex justify-between items-center text-xs">
-                  <div>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div>
                     <div className="font-semibold">
                       {DAY_NAMES[d.getDay()]} {formatDateItalian(e.date)}
                     </div>
@@ -253,6 +256,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                       <span className="block text-muted-foreground/80">
                         Tariffa: {formatCurrency(e.rate)}/h{e.overtimeMinutes ? ` · Extra: ${formatCurrency(e.overtimeRate || e.rate)}/h` : ''}
                       </span>
+                    </div>
                     </div>
                   </div>
                   <span className="font-bold text-success text-sm">

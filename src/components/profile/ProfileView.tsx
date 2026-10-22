@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { UserRound, LogOut, Mail, Heart } from 'lucide-react'
+import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck } from 'lucide-react'
 import type { Theme } from '@/App'
 
 interface ProfileViewProps {
@@ -8,9 +8,11 @@ interface ProfileViewProps {
   theme: Theme
   onThemeChange: (theme: Theme) => void
   onSignOut: () => void
+  jobsCount: number
+  entriesCount: number
 }
 
-export function ProfileView({ email, theme, onThemeChange, onSignOut }: ProfileViewProps) {
+export function ProfileView({ email, theme, onThemeChange, onSignOut, jobsCount, entriesCount }: ProfileViewProps) {
   return (
     <div className="space-y-4 pb-24">
       <div>
@@ -45,6 +47,11 @@ export function ProfileView({ email, theme, onThemeChange, onSignOut }: ProfileV
           </Button>
         </CardContent>
       </Card>
+      <div className="grid grid-cols-2 gap-3">
+        <Card><CardContent className="p-4"><BriefcaseBusiness className="h-4 w-4 text-primary" /><p className="mt-3 text-2xl font-black">{jobsCount}</p><p className="text-xs text-muted-foreground">Lavori attivi</p></CardContent></Card>
+        <Card><CardContent className="p-4"><ClipboardList className="h-4 w-4 text-primary" /><p className="mt-3 text-2xl font-black">{entriesCount}</p><p className="text-xs text-muted-foreground">Registrazioni</p></CardContent></Card>
+      </div>
+      <Card><CardContent className="flex items-start gap-3 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" /><div><p className="text-sm font-semibold">I tuoi dati sono protetti</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">L’accesso è riservato al tuo account e le operazioni sono protette dalle policy di sicurezza del database.</p></div></CardContent></Card>
       <p className="flex items-center justify-center gap-1.5 pb-2 text-xs text-muted-foreground">
         Creato da Antonio con <Heart className="h-3.5 w-3.5 fill-rose-400 text-rose-400" aria-label="amore" /> per Anna
       </p>

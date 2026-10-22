@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS public.entries (
   overtime_minutes INTEGER NOT NULL DEFAULT 0,
   overtime_rate NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
   paid BOOLEAN NOT NULL DEFAULT FALSE,
+  paid_at TIMESTAMPTZ,
+  payment_method TEXT,
+  payment_note TEXT,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()

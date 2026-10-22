@@ -1,6 +1,6 @@
-import { BriefcaseBusiness, CalendarDays, ClipboardList, MessageSquareText, UserRound } from 'lucide-react'
+import { BriefcaseBusiness, CalendarDays, ClipboardList, MessageSquareText, UserRound, WalletCards } from 'lucide-react'
 
-export type TabType = 'reg' | 'rep' | 'jobs' | 'msg' | 'profile'
+export type TabType = 'reg' | 'rep' | 'payments' | 'jobs' | 'msg' | 'profile'
 
 interface BottomNavProps {
   currentTab: TabType
@@ -10,6 +10,7 @@ interface BottomNavProps {
 const tabs: Array<{ id: TabType; label: string; icon: typeof CalendarDays }> = [
   { id: 'reg', label: 'Registra', icon: CalendarDays },
   { id: 'rep', label: 'Report', icon: ClipboardList },
+  { id: 'payments', label: 'Pagamenti', icon: WalletCards },
   { id: 'jobs', label: 'Lavori', icon: BriefcaseBusiness },
   { id: 'msg', label: 'Messaggio', icon: MessageSquareText },
   { id: 'profile', label: 'Profilo', icon: UserRound },
