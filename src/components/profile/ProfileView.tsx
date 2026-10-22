@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck } from 'lucide-react'
 import type { Theme } from '@/App'
+import { Select } from '@/components/ui/select'
 
 interface ProfileViewProps {
   email: string
@@ -32,15 +33,12 @@ export function ProfileView({ email, theme, onThemeChange, onSignOut, jobsCount,
           </div>
           <div className="rounded-2xl border border-border/80 bg-background/50 p-3">
             <label htmlFor="theme-select" className="mb-2 block text-xs font-semibold text-muted-foreground">Aspetto dell’app</label>
-            <select
+            <Select
               id="theme-select"
               value={theme}
-              onChange={(event) => onThemeChange(event.target.value as Theme)}
-              className="select-modern"
-            >
-              <option value="dark">🌙 Modalità scura</option>
-              <option value="light">☀️ Modalità chiara</option>
-            </select>
+              onChange={(value) => onThemeChange(value as Theme)}
+              options={[{ value: 'dark', label: '🌙 Modalità scura' }, { value: 'light', label: '☀️ Modalità chiara' }]}
+            />
           </div>
           <Button variant="outline" className="w-full" onClick={onSignOut}>
             <LogOut className="mr-2 h-4 w-4" /> Esci dall’account

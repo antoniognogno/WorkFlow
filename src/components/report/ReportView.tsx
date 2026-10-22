@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
 import { ChevronLeft, ChevronRight, Share2, Copy } from 'lucide-react'
 import { toast } from 'sonner'
+import { Select } from '@/components/ui/select'
 
 interface Job {
   id: string
@@ -169,23 +170,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       )}
 
       {/* Filtro Lavori / Clienti */}
-      <select
+      <Select
         value={filter}
-        onChange={(e) => setFilter(e.target.value)}
-        className="select-modern"
-      >
-        <option value="all">Tutti i lavori</option>
-        {jobs.map((j) => (
-          <option key={j.id} value={`j:${j.id}`}>
-            {j.name} {j.client ? `· ${j.client}` : ''}
-          </option>
-        ))}
-        {uniqueClients.map((c) => (
-          <option key={c} value={`c:${c}`}>
-            Cliente: {c}
-          </option>
-        ))}
-      </select>
+        onChange={setFilter}
+        options={[
+          { value: 'all', label: 'Tutti i lavori' },
+          ...jobs.map((j) => ({ value: `j:${j.id}`, label: `${j.name} ${j.client ? `· ${j.client}` : ''}` })),
+          ...uniqueClients.map((c) => ({ value: `c:${c}`, label: `Cliente: ${c}` })),
+        ]}
+      />
 
       {/* Scheda Totali */}
       <Card className="bg-card">

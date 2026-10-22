@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { calculateMinutes, formatCurrency, formatDateItalian, formatDuration } from '@/lib/utils'
 import { Archive, BriefcaseBusiness, Clock3, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Select } from '@/components/ui/select'
 
 interface Job {
   id: string
@@ -143,9 +144,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
       <Card><CardContent className="p-4">
         <div className="mb-3 flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" /><h3 className="font-bold">{editingId ? 'Modifica registrazione' : 'Registra attività'}</h3>{editingId && <button type="button" className="ml-auto text-muted-foreground" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></button>}</div>
         <form onSubmit={submitEntry} className="space-y-3">
-          <select value={form.jobId} onChange={(event) => updateForm('jobId', event.target.value)} className="select-modern" required>
-            <option value="">Scegli un lavoro</option>{jobs.map((job) => <option key={job.id} value={job.id}>{job.name} · {formatCurrency(job.rate)}/h</option>)}
-          </select>
+          <Select value={form.jobId} onChange={(value) => updateForm('jobId', value)} required options={[{ value: '', label: 'Scegli un lavoro' }, ...jobs.map((job) => ({ value: job.id, label: `${job.name} · ${formatCurrency(job.rate)}/h` }))]} />
           <div className="grid grid-cols-2 gap-2">
             <Input type="text" inputMode="numeric" autoComplete="off" placeholder="gg/mm/aaaa" aria-label="Data (giorno, mese, anno)" value={dateInput} onChange={(event) => setDateInput(event.target.value)} onBlur={() => { const normalized = normalizeDateInput(dateInput); if (normalized) { updateForm('date', normalized); setDateInput(formatDateInput(normalized)) } }} required />
             <div className="grid min-w-0 grid-cols-2 gap-2"><Input type="text" inputMode="numeric" autoComplete="off" placeholder="Inizio (hh:mm)" aria-label="Orario di inizio" value={form.start} onChange={(event) => updateForm('start', event.target.value)} onBlur={() => { const normalized = normalizeTimeInput(form.start); if (normalized) updateForm('start', normalized) }} required /><Input type="text" inputMode="numeric" autoComplete="off" placeholder="Fine (hh:mm)" aria-label="Orario di fine" value={form.end} onChange={(event) => updateForm('end', event.target.value)} onBlur={() => { const normalized = normalizeTimeInput(form.end); if (normalized) updateForm('end', normalized) }} required /></div>
