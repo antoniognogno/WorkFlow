@@ -2,7 +2,8 @@ import React, { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange } from '@/lib/utils'
-import { ArrowLeft, CalendarRange, CheckCircle2, ChevronDown, ReceiptText, WalletCards } from 'lucide-react'
+import { ArrowLeft, CalendarRange, CheckCircle2, ChevronDown, Pencil, ReceiptText, WalletCards } from 'lucide-react'
+import { Select } from '@/components/ui/select'
 
 interface Job {
   id: string
@@ -30,6 +31,8 @@ interface PaymentsViewProps {
   jobs: Job[]
   entries: Entry[]
   onMarkEntriesPaid: (ids: string[], paidDate: string, paymentMethod: string | null, paymentNote: string | null) => Promise<void>
+  onUpdatePayment: (id: string, paidDate: string, paymentMethod: string | null, paymentNote: string | null) => Promise<void>
+  onCancelPayment: (id: string) => Promise<void>
 }
 
 type Period = 'last30' | 'month' | 'quarter' | 'custom'
@@ -45,7 +48,7 @@ const rollingRange = (days: number): [string, string] => {
   return [start.toISOString().slice(0, 10), end.toISOString().slice(0, 10)]
 }
 
-export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMarkEntriesPaid }) => {
+export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMarkEntriesPaid, onUpdatePayment, onCancelPayment }) => {
   const [period, setPeriod] = useState<Period>('last30')
   const [offset, setOffset] = useState(0)
   const [customFrom, setCustomFrom] = useState('')
@@ -61,6 +64,12 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
   const [statementOffset, setStatementOffset] = useState(0)
   const [statementFrom, setStatementFrom] = useState('')
   const [statementTo, setStatementTo] = useState('')
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
+  const [editPaymentDate, setEditPaymentDate] = useState('')
+  const [editPaymentMethod, setEditPaymentMethod] = useState('')
+  const [editPaymentNote, setEditPaymentNote] = useState('')
+  const [cancelPaymentId, setCancelPaymentId] = useState<string | null>(null)
+  const [cancelConfirmation, setCancelConfirmation] = useState('')
 
   const [startDate, endDate] = period === 'last30'
     ? rollingRange(30)
@@ -85,6 +94,47 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
     return paymentDate >= statementStart && paymentDate <= statementEnd
   })
   const statementTotal = statementEntries.reduce((sum, entry) => sum + amountFor(entry), 0)
+
+  const beginPaymentEdit = (entry: Entry) => {
+    setEditingPaymentId(entry.id)
+    setEditPaymentDate(entry.paidAt?.slice(0, 10) ?? entry.date)
+    setEditPaymentMethod(entry.paymentMethod ?? '')
+    setEditPaymentNote(entry.paymentNote ?? '')
+    setCancelPaymentId(null)
+  }
+
+  const savePaymentEdit = async () => {
+    if (!editingPaymentId || !editPaymentDate) return
+    await onUpdatePayment(editingPaymentId, editPaymentDate, editPaymentMethod || null, editPaymentNote.trim() || null)
+    setEditingPaymentId(null)
+  }
+
+  const confirmPaymentCancellation = async () => {
+    if (!cancelPaymentId || cancelConfirmation !== 'Annulla') return
+    await onCancelPayment(cancelPaymentId)
+    setCancelPaymentId(null)
+    setCancelConfirmation('')
+  }
+
+  const renderPaidEntry = (entry: Entry) => {
+    const isEditing = editingPaymentId === entry.id
+    const isCancelling = cancelPaymentId === entry.id
+    return (
+      <div key={entry.id} className="flex flex-wrap items-center gap-3 py-3">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-success/30 bg-card text-success"><CheckCircle2 className="h-4 w-4" /></div>
+        {isEditing ? <div className="min-w-0 flex-1 space-y-2">
+          <p className="text-xs font-semibold">Modifica dettagli pagamento</p>
+          <input type="date" value={editPaymentDate} onChange={(event) => setEditPaymentDate(event.target.value)} className="select-modern" aria-label="Data pagamento modificata" />
+          <Select value={editPaymentMethod} onChange={setEditPaymentMethod} options={[{ value: '', label: 'Non specificato' }, { value: 'bonifico', label: 'Bonifico bancario' }, { value: 'contanti', label: 'Contanti' }, { value: 'carta', label: 'Carta' }, { value: 'paypal', label: 'PayPal' }, { value: 'altro', label: 'Altro' }]} />
+          <input type="text" value={editPaymentNote} onChange={(event) => setEditPaymentNote(event.target.value)} placeholder="Nota o riferimento" className="select-modern" maxLength={120} aria-label="Nota pagamento modificata" />
+          <div className="flex gap-2"><Button size="sm" onClick={() => void savePaymentEdit()}>Salva</Button><Button size="sm" variant="outline" onClick={() => setEditingPaymentId(null)}>Annulla</Button></div>
+        </div> : <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{getJob(entry.jobId)?.name ?? 'Lavoro'}{getJob(entry.jobId)?.client ? ` · ${getJob(entry.jobId)?.client}` : ''}</p><p className="text-[11px] text-muted-foreground">{entry.paidAt ? `Ricevuto il ${formatDateItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateItalian(entry.date)}`}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}{entry.paymentNote ? ` · ${entry.paymentNote}` : ''}</p></div>}
+        {!isEditing && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => beginPaymentEdit(entry)} aria-label="Modifica dettagli pagamento"><Pencil className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setCancelPaymentId(entry.id); setCancelConfirmation('') }}>Annulla pagamento</Button></div>}
+        <span className="text-sm font-bold text-success">{formatCurrency(amountFor(entry))}</span>
+        {isCancelling && <div className="w-full rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-xs"><p className="font-semibold text-destructive">Le ore resteranno, ma questo importo tornerà tra quelli da ricevere.</p><p className="mt-1 text-muted-foreground">Scrivi esattamente <strong>Annulla</strong> per confermare.</p><input value={cancelConfirmation} onChange={(event) => setCancelConfirmation(event.target.value)} placeholder="Scrivi Annulla" className="select-modern mt-2" aria-label="Conferma annullamento pagamento" /><div className="mt-2 flex gap-2"><Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={cancelConfirmation !== 'Annulla'} onClick={() => void confirmPaymentCancellation()}>Conferma annullamento</Button><Button size="sm" variant="outline" onClick={() => setCancelPaymentId(null)}>Indietro</Button></div></div>}
+      </div>
+    )
+  }
 
   if (showStatement) {
     return (
@@ -139,13 +189,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
           <CardContent className="p-4">
             {statementEntries.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">Nessun incasso nel periodo selezionato.</p> : (
               <div className="divide-y divide-border">
-                {statementEntries.map((entry) => (
-                  <div key={entry.id} className="flex items-center gap-3 py-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-success/30 bg-card text-success"><CheckCircle2 className="h-4 w-4" /></div>
-                    <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{getJob(entry.jobId)?.name ?? 'Lavoro'}{getJob(entry.jobId)?.client ? ` · ${getJob(entry.jobId)?.client}` : ''}</p><p className="text-[11px] text-muted-foreground">{entry.paidAt ? `Ricevuto il ${formatDateItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateItalian(entry.date)}`}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}{entry.paymentNote ? ` · ${entry.paymentNote}` : ''}</p></div>
-                    <span className="text-sm font-bold text-success">{formatCurrency(amountFor(entry))}</span>
-                  </div>
-                ))}
+                {statementEntries.map(renderPaidEntry)}
               </div>
             )}
           </CardContent>
@@ -228,14 +272,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
               <input type="date" value={paymentDate} onChange={(event) => setPaymentDate(event.target.value)} className="select-modern mt-1" />
             </label>
             <label className="block text-xs text-muted-foreground">Metodo di pagamento
-              <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="select-modern mt-1">
-                <option value="">Non specificato</option>
-                <option value="bonifico">Bonifico bancario</option>
-                <option value="contanti">Contanti</option>
-                <option value="carta">Carta</option>
-                <option value="paypal">PayPal</option>
-                <option value="altro">Altro</option>
-              </select>
+              <Select value={paymentMethod} onChange={setPaymentMethod} className="mt-1" options={[{ value: '', label: 'Non specificato' }, { value: 'bonifico', label: 'Bonifico bancario' }, { value: 'contanti', label: 'Contanti' }, { value: 'carta', label: 'Carta' }, { value: 'paypal', label: 'PayPal' }, { value: 'altro', label: 'Altro' }]} />
             </label>
             <label className="block text-xs text-muted-foreground">Nota o riferimento (facoltativo)
               <input type="text" value={paymentNote} onChange={(event) => setPaymentNote(event.target.value)} placeholder="Es. ricevuta, CRO, nota cliente" className="select-modern mt-1" maxLength={120} />
@@ -310,7 +347,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
           <button type="button" onClick={() => setShowPaid((value) => !value)} className="flex w-full items-center justify-between text-sm font-bold">
             <span>Già pagati ({paidEntries.length})</span><ChevronDown className={`h-4 w-4 transition-transform ${showPaid ? 'rotate-180' : ''}`} />
           </button>
-          {showPaid && <div className="mt-3 space-y-2 border-t border-border pt-3">{paidEntries.map((entry) => <div key={entry.id} className="flex justify-between text-xs text-muted-foreground"><span>{formatDateItalian(entry.date)} · {getJob(entry.jobId)?.name ?? 'Lavoro'}<span className="block text-[10px]">{entry.paidAt ? `Ricevuto il ${formatDateItalian(entry.paidAt.slice(0, 10))}` : 'Data non disponibile'}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}</span></span><span className="font-semibold text-emerald-400">{formatCurrency(amountFor(entry))}</span></div>)}</div>}
+          {showPaid && <div className="mt-3 divide-y divide-border border-t border-border pt-3">{paidEntries.map(renderPaidEntry)}</div>}
         </CardContent>
       </Card>}
 

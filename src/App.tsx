@@ -200,6 +200,32 @@ export default function App() {
     await loadData()
   }
 
+  const updateJob = async (id: string, name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, applyToEntries: boolean) => {
+    const { error } = await supabase.from('jobs').update({
+      name,
+      client: client || null,
+      rate,
+      overtime_enabled: overtimeEnabled,
+      overtime_multiplier: overtimeMultiplier,
+    }).eq('id', id)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    if (applyToEntries) {
+      const { error: entriesError } = await supabase.from('entries').update({
+        rate,
+        overtime_rate: overtimeEnabled ? rate * overtimeMultiplier : rate,
+      }).eq('job_id', id)
+      if (entriesError) {
+        toast.error(entriesError.message)
+        return
+      }
+    }
+    toast.success(applyToEntries ? 'Lavoro e registrazioni aggiornati' : 'Lavoro aggiornato')
+    await loadData()
+  }
+
   const deleteJob = async (id: string) => {
     const { error } = await supabase.from('jobs').delete().eq('id', id)
     if (error) {
@@ -335,6 +361,35 @@ export default function App() {
     await loadData()
   }
 
+  const updatePayment = async (id: string, paidDate: string, paymentMethod: string | null, paymentNote: string | null) => {
+    const { error } = await supabase.from('entries').update({
+      paid_at: new Date(`${paidDate}T12:00:00`).toISOString(),
+      payment_method: paymentMethod,
+      payment_note: paymentNote,
+    }).eq('id', id)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success('Dettagli pagamento aggiornati')
+    await loadData()
+  }
+
+  const cancelPayment = async (id: string) => {
+    const { error } = await supabase.from('entries').update({
+      paid: false,
+      paid_at: null,
+      payment_method: null,
+      payment_note: null,
+    }).eq('id', id)
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success('Pagamento annullato: voce nuovamente da ricevere')
+    await loadData()
+  }
+
   return (
     <div className="flex min-h-screen flex-col justify-between bg-background text-foreground">
       <Toaster position="top-center" richColors />
@@ -355,8 +410,8 @@ export default function App() {
         {loading ? <p className="py-12 text-center text-sm text-muted-foreground">Caricamento dati…</p> : <>
           {currentTab === 'reg' && <RegisterView jobs={jobs} entries={entries} trashEntries={trashEntries} onAddEntry={addEntry} onUpdateEntry={updateEntry} onDeleteEntry={deleteEntry} onRestoreEntry={restoreEntry} onPermanentlyDeleteEntry={permanentlyDeleteEntry} onCreateJob={createJob} />}
           {currentTab === 'rep' && <ReportView jobs={jobs} entries={entries} />}
-          {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} />}
-          {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
+          {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
+          {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
           {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} />}
         </>}
