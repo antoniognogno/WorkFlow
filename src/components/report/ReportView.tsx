@@ -42,6 +42,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [filter, setFilter] = useState('all')
+  const [groupSameName, setGroupSameName] = useState(false)
   const [totalTemplate, setTotalTemplate] = useState(
     localStorage.getItem('report_total_template') || 'Totale: {ore} = {euro}'
   )
@@ -78,7 +79,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const breakdown: Record<string, number> = {}
   filteredEntries.forEach((e) => {
     const j = getJob(e.jobId)
-    const key = `${j.name}${j.client ? ` · ${j.client}` : ''}`
+    const key = groupSameName ? j.name : `${j.name}${j.client ? ` · ${j.client}` : ''}`
     breakdown[key] = (breakdown[key] || 0) + (e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate)
   })
 
@@ -179,6 +180,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
           ...uniqueClients.map((c) => ({ value: `c:${c}`, label: `Cliente: ${c}` })),
         ]}
       />
+      <label className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
+        <input type="checkbox" checked={groupSameName} onChange={(event) => setGroupSameName(event.target.checked)} className="h-4 w-4 accent-primary" />
+        Raggruppa nel riepilogo i lavori con lo stesso nome
+      </label>
 
       {/* Scheda Totali */}
       <Card className="bg-card">

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { JobsView } from '@/components/jobs/JobsView'
 import { RegisterView } from '@/components/register/RegisterView'
 import { PaymentsView } from '@/components/payments/PaymentsView'
+import { ReportView } from '@/components/report/ReportView'
 
 const job = {
   id: 'job-1',
@@ -78,6 +79,18 @@ describe('main user workflows', () => {
     expect(onAddEntry).toHaveBeenCalledWith('job-1', entry.date, '09:00', '11:30', 15, 0)
   })
 
+  it('shows the client when selecting between jobs with the same name', async () => {
+    const user = userEvent.setup()
+    const secondJob = { ...job, id: 'job-2', client: 'ASD Pieris' }
+
+    render(<RegisterView jobs={[job, secondJob]} entries={[]} trashEntries={[]} onAddEntry={noopAsync} onUpdateEntry={noopAsync} onDeleteEntry={noopAsync} onRestoreEntry={noopAsync} onPermanentlyDeleteEntry={noopAsync} onCreateJob={noopAsync} />)
+    const jobSelectButton = screen.getByRole('button', { name: /Babysitter · Martina ·/, has: undefined })
+    await user.click(jobSelectButton)
+
+    expect(screen.getByRole('option', { name: /Babysitter · Martina/ })).toBeVisible()
+    expect(screen.getByRole('option', { name: /Babysitter · ASD Pieris/ })).toBeVisible()
+  })
+
   it('opens an entry for editing and saves the updated times', async () => {
     const user = userEvent.setup()
     const onUpdateEntry = vi.fn().mockResolvedValue(undefined)
@@ -120,5 +133,18 @@ describe('main user workflows', () => {
     await user.type(screen.getByRole('textbox', { name: 'Conferma annullamento pagamento' }), 'Annulla')
     await user.click(screen.getByRole('button', { name: 'Conferma annullamento' }))
     expect(onCancelPayment).toHaveBeenCalledWith('entry-1')
+  })
+
+  it('can group same-named jobs in the report breakdown', async () => {
+    const user = userEvent.setup()
+    const secondJob = { ...job, id: 'job-2', client: 'ASD Pieris' }
+    const secondEntry = { ...entry, id: 'entry-2', jobId: secondJob.id }
+
+    render(<ReportView jobs={[job, secondJob]} entries={[entry, secondEntry]} />)
+
+    await user.click(screen.getByRole('checkbox', { name: /Raggruppa nel riepilogo/ }))
+
+    expect(screen.getAllByText('Babysitter').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/30,00/).length).toBeGreaterThan(0)
   })
 })
