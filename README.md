@@ -32,13 +32,6 @@ Each work entry can include:
 
 Entries can be created, edited, moved to the trash, restored, or permanently deleted. Compact time input such as `0900` and `1130` is normalized to `09:00` and `11:30`.
 
-The job selector includes the job name, client, and hourly rate, making duplicate job names unambiguous:
-
-```text
-Babysitter · Martina · €15.00/h
-Babysitter · ASD Pieris · €15.00/h
-```
-
 #### Reporting
 
 The reporting view supports:
