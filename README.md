@@ -1,6 +1,5 @@
 # WorkFlow
 
-## English
 Why?
 
 Because I needed this app (pwa) with these funciontality free.
