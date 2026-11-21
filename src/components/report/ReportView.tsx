@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, Target, CalendarCheck, Trophy, Clock3, WalletCards, Award, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, CalendarCheck, Clock3, WalletCards, Award } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/select'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -75,6 +75,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   )
   const [goals] = useState(() => loadGoals())
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [dashboardMonthOffset, setDashboardMonthOffset] = useState(0)
   const [period, setPeriod] = useState<Period>('last30')
   const [offset, setOffset] = useState(0)
   const [customFrom, setCustomFrom] = useState('')
@@ -84,6 +85,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const [totalTemplate, setTotalTemplate] = useState(
     localStorage.getItem('report_total_template') || 'Totale: {ore} = {euro}'
   )
+
+  useEffect(() => {
+    const selectedMonth = new Date()
+    selectedMonth.setMonth(selectedMonth.getMonth() + dashboardMonthOffset)
+    const year = selectedMonth.getFullYear()
+    const month = String(selectedMonth.getMonth() + 1).padStart(2, '0')
+    setSelectedCalendarDate(`${year}-${month}-01`)
+  }, [dashboardMonthOffset])
 
   const getRollingRange = (days: number): [string, string] => {
     const end = new Date()
@@ -171,6 +180,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
 
   const dashboard = useMemo(() => {
     const now = new Date()
+    now.setMonth(now.getMonth() + dashboardMonthOffset)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 12)
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 12)
     const monthFrom = monthStart.toISOString().slice(0, 10)
@@ -231,9 +241,22 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       monthPay,
       averageHoursPerDay: workdays > 0 ? monthMinutes / 60 / workdays : 0,
       forecastPay: (() => {
-        const elapsedDays = Math.max(1, now.getDate())
-        const dailyAverage = monthPay / elapsedDays
-        return dailyAverage * monthEnd.getDate()
+        const previousMonthTotals: number[] = []
+        for (let offset = 1; offset <= 3; offset += 1) {
+          const start = new Date(now.getFullYear(), now.getMonth() - offset, 1, 12)
+          const end = new Date(now.getFullYear(), now.getMonth() - offset + 1, 0, 12)
+          const historyEntries = entries.filter((entry) =>
+            entry.date >= start.toISOString().slice(0, 10) &&
+            entry.date <= end.toISOString().slice(0, 10),
+          )
+          previousMonthTotals.push(historyEntries.reduce((sum, entry) =>
+            sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate),
+          0))
+        }
+        const available = previousMonthTotals.filter((value) => value > 0)
+        return available.length > 0
+          ? available.reduce((sum, value) => sum + value, 0) / available.length
+          : monthPay
       })(),
       paidPay,
       outstandingPay: Math.max(0, monthPay - paidPay),
@@ -288,7 +311,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
         }
       })(),
     }
-  }, [entries, goals, jobs])
+  }, [dashboardMonthOffset, entries, goals, jobs])
 
   // Generatore testo messaggio
   const generateMessage = () => {
@@ -377,12 +400,27 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               <p className="text-sm text-muted-foreground">Riepilogo mensile</p>
               <h2 className="text-2xl font-black capitalize">{dashboard.monthLabel}</h2>
             </div>
-            {dashboard.earningsVariation !== 0 && (
-              <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${dashboard.earningsVariation >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
-                {dashboard.earningsVariation >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                {dashboard.earningsVariation >= 0 ? '+' : ''}{dashboard.earningsVariation.toFixed(1)}%
-              </span>
-            )}
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl"
+                onClick={() => setDashboardMonthOffset((offset) => offset - 1)}
+                aria-label="Mese precedente"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl"
+                onClick={() => setDashboardMonthOffset((offset) => offset + 1)}
+                disabled={dashboardMonthOffset >= 0}
+                aria-label="Mese successivo"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -412,9 +450,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             </Card>
             <Card>
               <CardContent className="p-4">
-                <p className="text-xs text-muted-foreground">Previsione mese</p>
+                <p className="text-xs text-muted-foreground">Media ultimi 3 mesi</p>
                 <p className="mt-2 text-xl font-black text-success">{formatCurrency(dashboard.forecastPay)}</p>
-                <p className="mt-1 text-[11px] text-muted-foreground">basata sul ritmo attuale</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">riferimento storico</p>
               </CardContent>
             </Card>
           </div>
@@ -531,97 +569,6 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               </div>
             </CardContent>
           </Card>
-
-          {goals.weeklyHours > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-bold">Obiettivo settimanale intelligente</p>
-                    {dashboard.weekRemainingHours.completed ? (
-                      <p className="mt-1 text-xs font-semibold text-success">Obiettivo raggiunto. Ottimo ritmo questa settimana.</p>
-                    ) : (
-                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                        Mancano <strong className="text-foreground">{dashboard.weekRemainingHours.remainingHours.toFixed(1)} h</strong>.
-                        {' '}Lavora circa <strong className="text-foreground">{dashboard.weekRemainingHours.perDay.toFixed(1)} h al giorno</strong> nei giorni rimanenti.
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {goals.monthlyHours > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><Target className="h-4 w-4 text-primary" /><p className="text-sm font-bold">Obiettivo ore</p></div>
-                  <p className="text-sm font-black">{formatDuration(dashboard.monthMinutes)} / {goals.monthlyHours} h</p>
-                </div>
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted/50">
-                  <div
-                    className="h-full rounded-full bg-primary transition-[width] duration-700"
-                    style={{ width: `${Math.min(100, (dashboard.monthMinutes / 60 / goals.monthlyHours) * 100)}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {dashboard.remainingHours > 0
-                    ? `${dashboard.remainingHours.toFixed(1)} h restanti · circa ${(dashboard.remainingHours / dashboard.remainingDays).toFixed(1)} h al giorno`
-                    : 'Obiettivo mensile raggiunto'}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {goals.monthlyEarnings > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2"><Trophy className="h-4 w-4 text-success" /><p className="text-sm font-bold">Obiettivo guadagno</p></div>
-                  <p className="text-sm font-black">{Math.min(100, (dashboard.monthPay / goals.monthlyEarnings) * 100).toFixed(0)}%</p>
-                </div>
-                <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted/50">
-                  <div
-                    className="h-full rounded-full bg-success transition-[width] duration-700"
-                    style={{ width: `${Math.min(100, (dashboard.monthPay / goals.monthlyEarnings) * 100)}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {dashboard.remainingEarnings > 0
-                    ? `${formatCurrency(dashboard.remainingEarnings)} mancanti · circa ${formatCurrency(dashboard.remainingEarnings / dashboard.remainingDays)} al giorno`
-                    : 'Obiettivo mensile raggiunto'}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {dashboard.jobProgress.length > 0 && (
-            <Card>
-              <CardContent className="p-4">
-                <p className="text-sm font-bold">Obiettivi per lavoro</p>
-                <div className="mt-3 space-y-3">
-                  {dashboard.jobProgress.map((item) => {
-                    const progress = item.target > 0 ? Math.min(100, (item.pay / item.target) * 100) : 0
-                    return (
-                      <div key={item.id}>
-                        <div className="mb-1.5 flex justify-between text-xs">
-                          <span className="font-bold" style={{ color: item.color }}>{item.name}{item.client ? ` · ${item.client}` : ''}</span>
-                          <span className="font-semibold">{formatCurrency(item.pay)} / {formatCurrency(item.target)}</span>
-                        </div>
-                        <div className="h-2 overflow-hidden rounded-full bg-muted/50">
-                          <div className="h-full rounded-full transition-[width] duration-700" style={{ width: `${progress}%`, backgroundColor: item.color }} />
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          )}
 
           {dashboard.weeklyData.length > 0 && (
             <Card>
