@@ -77,7 +77,7 @@ describe('main user workflows', () => {
     await user.type(screen.getByRole('spinbutton', { name: /Pausa/ }), '15')
     await user.click(screen.getByRole('button', { name: 'Registra ora' }))
 
-    expect(onAddEntry).toHaveBeenCalledWith('job-1', entry.date, '09:00', '11:30', 15, 0)
+    expect(onAddEntry).toHaveBeenCalledWith('job-1', entry.date, '09:00', '11:30', 15, 0, '')
   })
 
   it('shows the client when selecting between jobs with the same name', async () => {
@@ -103,7 +103,7 @@ describe('main user workflows', () => {
     await user.type(startInputs[startInputs.length - 1], '1000')
     await user.click(screen.getByRole('button', { name: 'Salva modifiche' }))
 
-    expect(onUpdateEntry).toHaveBeenCalledWith('entry-1', 'job-1', entry.date, '10:00', '18:00', 0, 0)
+    expect(onUpdateEntry).toHaveBeenCalledWith('entry-1', 'job-1', entry.date, '10:00', '18:00', 0, 0, '')
   })
 
   it('confirms a selected payment with optional details', async () => {

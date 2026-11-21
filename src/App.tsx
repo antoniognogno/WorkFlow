@@ -75,6 +75,7 @@ interface Entry {
   overtimeMinutes: number
   overtimeRate: number
   deletedAt: string | null
+  note: string
 }
 
 interface RemoteJob {
@@ -110,6 +111,7 @@ interface RemoteEntry {
   overtime_minutes: number
   overtime_rate: number
   deleted_at: string | null
+  note: string | null
 }
 
 const minutesBetween = (start: string, end: string) => {
@@ -169,17 +171,6 @@ export default function App() {
       return
     }
     toast.success('Controlla entrambe le email per confermare la modifica')
-  }
-
-  const deleteAccount = async () => {
-    const { error } = await supabase.rpc('delete_own_account')
-    if (error) {
-      toast.error(error.message)
-      return
-    }
-    await db.delete()
-    await supabase.auth.signOut()
-    toast.success('Account eliminato')
   }
 
   useEffect(() => {
@@ -269,6 +260,7 @@ export default function App() {
         overtimeMinutes: entry.overtimeMinutes,
         overtimeRate: entry.overtimeRate,
         deletedAt: entry.deletedAt,
+        note: entry.note,
       }))
       setEntries(mappedLocalEntries.filter((entry) => !entry.deletedAt))
       setTrashEntries(mappedLocalEntries.filter((entry) => entry.deletedAt))
@@ -284,7 +276,7 @@ export default function App() {
     const [jobsWithOvertime, presetsResult, entriesWithFeatures] = await Promise.all([
       supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier,color').order('name'),
       supabase.from('presets').select('id,job_id,start_time,end_time'),
-      supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,paid_at,payment_method,payment_note,deleted_at').order('date', { ascending: false }),
+      supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,paid_at,payment_method,payment_note,deleted_at,note').order('date', { ascending: false }),
     ])
     let jobsData = (jobsWithOvertime.data ?? []) as RemoteJob[]
     let jobsError = jobsWithOvertime.error
@@ -305,7 +297,8 @@ export default function App() {
       isMissingColumnError(entriesWithFeatures.error?.message, 'deleted_at') ||
       isMissingColumnError(entriesWithFeatures.error?.message, 'paid_at') ||
       isMissingColumnError(entriesWithFeatures.error?.message, 'payment_method') ||
-      isMissingColumnError(entriesWithFeatures.error?.message, 'payment_note')
+      isMissingColumnError(entriesWithFeatures.error?.message, 'payment_note') ||
+      isMissingColumnError(entriesWithFeatures.error?.message, 'note')
     ) {
       const fallbackEntries = await supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,paid').order('date', { ascending: false })
       entriesData = (fallbackEntries.data ?? []) as RemoteEntry[]
@@ -332,7 +325,7 @@ export default function App() {
     const mappedEntries = entriesData.map((entry) => ({
       id: entry.id, jobId: entry.job_id, date: entry.date, start: entry.start_time.slice(0, 5), end: entry.end_time.slice(0, 5),
       minutes: entry.minutes, rate: Number(entry.rate), paid: entry.paid, paidAt: entry.paid_at ?? null, paymentMethod: entry.payment_method ?? null, paymentNote: entry.payment_note ?? null, breakMinutes: entry.break_minutes ?? 0,
-      overtimeMinutes: entry.overtime_minutes ?? 0, overtimeRate: Number(entry.overtime_rate ?? 0), deletedAt: entry.deleted_at,
+      overtimeMinutes: entry.overtime_minutes ?? 0, overtimeRate: Number(entry.overtime_rate ?? 0), deletedAt: entry.deleted_at, note: entry.note ?? '',
     }))
     setEntries(mappedEntries.filter((entry) => !entry.deletedAt))
     setTrashEntries(mappedEntries.filter((entry) => entry.deletedAt))
@@ -374,6 +367,7 @@ export default function App() {
         overtimeMinutes: entry.overtimeMinutes,
         overtimeRate: entry.overtimeRate,
         deletedAt: entry.deletedAt,
+        note: entry.note,
         synced: true,
         updatedAt: new Date().toISOString(),
       })))
@@ -529,7 +523,7 @@ export default function App() {
     await loadData()
   }
 
-  const addEntry = async (jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => {
+  const addEntry = async (jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number, note: string = '') => {
     const job = jobs.find((item) => item.id === jobId)
     const overtimeRate = job?.overtimeEnabled ? (job.rate * job.overtimeMultiplier) : job?.rate ?? 0
     if (!navigator.onLine) {
@@ -539,12 +533,14 @@ export default function App() {
         id, jobId, date, startTime: start, endTime: end, minutes, rate: job?.rate ?? 0,
         paid: false, paidAt: null, paymentMethod: null, paymentNote: null,
         breakMinutes, overtimeMinutes, overtimeRate, deletedAt: null, synced: false,
+        note: note.trim(),
         updatedAt: new Date().toISOString(),
       })
       await queueMutation('addEntry', {
         id, user_id: session.user.id, job_id: jobId, date, start_time: start, end_time: end,
         minutes, rate: job?.rate ?? 0, break_minutes: breakMinutes, overtime_minutes: overtimeMinutes,
         overtime_rate: overtimeRate, paid: false,
+        note: note.trim(),
       })
       await loadData()
       await refreshPendingCount()
@@ -555,8 +551,9 @@ export default function App() {
       user_id: session.user.id, job_id: jobId, date, start_time: start, end_time: end,
       minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes), rate: job?.rate ?? 0,
       break_minutes: breakMinutes, overtime_minutes: overtimeMinutes, overtime_rate: overtimeRate, paid: false,
+      note: note.trim(),
     })
-    if (error?.message.includes('break_minutes')) {
+    if (error?.message.includes('break_minutes') || error?.message.includes('note')) {
       const fallback = await supabase.from('entries').insert({
         user_id: session.user.id, job_id: jobId, date, start_time: start, end_time: end,
         minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes), rate: job?.rate ?? 0, paid: false,
@@ -571,7 +568,7 @@ export default function App() {
     await loadData()
   }
 
-  const updateEntry = async (id: string, jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => {
+  const updateEntry = async (id: string, jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number, note: string = '') => {
     const job = jobs.find((item) => item.id === jobId)
     if (!navigator.onLine) {
       const localEntry = await db.entries.get(id)
@@ -580,6 +577,7 @@ export default function App() {
         minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
         rate: job?.rate ?? 0, breakMinutes, overtimeMinutes,
         overtimeRate: job?.overtimeEnabled ? job.rate * job.overtimeMultiplier : job?.rate ?? 0,
+        note: note.trim(),
         synced: false, updatedAt: new Date().toISOString(),
       })
       await queueMutation('updateEntry', {
@@ -589,6 +587,7 @@ export default function App() {
           minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
           rate: job?.rate ?? 0, break_minutes: breakMinutes, overtime_minutes: overtimeMinutes,
           overtime_rate: job?.overtimeEnabled ? job.rate * job.overtimeMultiplier : job?.rate ?? 0,
+          note: note.trim(),
         },
       })
       await loadData()
@@ -601,8 +600,9 @@ export default function App() {
       minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
       rate: job?.rate ?? 0, break_minutes: breakMinutes, overtime_minutes: overtimeMinutes,
       overtime_rate: job?.overtimeEnabled ? job.rate * job.overtimeMultiplier : job?.rate ?? 0,
+      note: note.trim(),
     }).eq('id', id)
-    if (error?.message.includes('break_minutes')) {
+    if (error?.message.includes('break_minutes') || error?.message.includes('note')) {
       const fallback = await supabase.from('entries').update({
         job_id: jobId, date, start_time: start, end_time: end,
         minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
@@ -805,7 +805,7 @@ export default function App() {
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} onEmailChange={updateEmail} onDeleteAccount={deleteAccount} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} onEmailChange={updateEmail} />}
         </>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />

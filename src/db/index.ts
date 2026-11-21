@@ -37,6 +37,7 @@ export interface LocalEntry {
   overtimeMinutes: number
   overtimeRate: number
   deletedAt: string | null
+  note: string
   synced: boolean
   updatedAt: string
 }

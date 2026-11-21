@@ -30,6 +30,7 @@ interface Entry {
   paid: boolean
   paidAt: string | null
   paymentMethod: string | null
+  note?: string
 }
 
 interface ReportViewProps {
@@ -143,7 +144,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       const hours = formatDuration(e.minutes)
       const euro = formatCurrency((e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate))
       const overtime = e.overtimeMinutes ? ` + ${formatDuration(e.overtimeMinutes)} extra` : ''
-      return `${dayName} ${dateFormatted}: ${e.start}–${e.end} (${hours}${overtime}) → ${euro}`
+      const note = e.note?.trim() ? `\nNota: ${e.note.trim()}` : ''
+      return `${dayName} ${dateFormatted}: ${e.start}–${e.end} (${hours}${overtime}) → ${euro}${note}`
     })
     const totalLine = totalTemplate
       .replaceAll('{ore}', formatDuration(totalMinutes))
@@ -161,7 +163,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   }
 
   const handleExportCsv = () => {
-    const header = ['Data', 'Inizio', 'Fine', 'Lavoro', 'Cliente', 'Ore', 'Straordinari', 'Compenso']
+    const header = ['Data', 'Inizio', 'Fine', 'Lavoro', 'Cliente', 'Ore', 'Straordinari', 'Compenso', 'Note']
     const rows = filteredEntries.map((entry) => {
       const job = getJob(entry.jobId)
       const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
@@ -174,6 +176,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
         (entry.minutes / 60).toFixed(2),
         (entry.overtimeMinutes / 60).toFixed(2),
         amount.toFixed(2),
+        entry.note ?? '',
       ]
     })
     const csv = [header, ...rows]
@@ -450,6 +453,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                       <span className="block text-muted-foreground/80">
                         Tariffa: {formatCurrency(e.rate)}/h{e.overtimeMinutes ? ` · Extra: ${formatCurrency(e.overtimeRate || e.rate)}/h` : ''}
                       </span>
+                      {e.note?.trim() && (
+                        <span className="mt-1 block border-l-2 border-primary/40 pl-2 italic text-muted-foreground">
+                          {e.note.trim()}
+                        </span>
+                      )}
                     </div>
                     </div>
                   </div>

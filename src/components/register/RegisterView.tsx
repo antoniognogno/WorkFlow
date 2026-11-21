@@ -28,21 +28,22 @@ interface Entry {
   breakMinutes: number
   overtimeMinutes: number
   overtimeRate: number
+  note?: string
 }
 
 interface RegisterViewProps {
   jobs: Job[]
   entries: Entry[]
   trashEntries: Entry[]
-  onAddEntry: (jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => Promise<void>
-  onUpdateEntry: (id: string, jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => Promise<void>
+  onAddEntry: (jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number, note: string) => Promise<void>
+  onUpdateEntry: (id: string, jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number, note: string) => Promise<void>
   onDeleteEntry: (id: string) => Promise<void>
   onRestoreEntry: (id: string) => Promise<void>
   onPermanentlyDeleteEntry: (id: string) => Promise<void>
   onCreateJob: (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, color?: string) => Promise<void>
 }
 
-const emptyForm = { jobId: '', date: '', start: '16:00', end: '18:00', breakMinutes: '0', overtimeMinutes: '0' }
+const emptyForm = { jobId: '', date: '', start: '16:00', end: '18:00', breakMinutes: '0', overtimeMinutes: '0', note: '' }
 
 const formatDateInput = (isoDate: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate)
@@ -103,15 +104,15 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     if (!form.jobId || !date || !start || !end || calculateMinutes(start, end) <= 0) return
     const breakMinutes = Math.max(0, Number(form.breakMinutes) || 0)
     const overtimeMinutes = Math.max(0, Number(form.overtimeMinutes) || 0)
-    if (editingId) await onUpdateEntry(editingId, form.jobId, date, start, end, breakMinutes, overtimeMinutes)
-    else await onAddEntry(form.jobId, date, start, end, breakMinutes, overtimeMinutes)
+    if (editingId) await onUpdateEntry(editingId, form.jobId, date, start, end, breakMinutes, overtimeMinutes, form.note)
+    else await onAddEntry(form.jobId, date, start, end, breakMinutes, overtimeMinutes, form.note)
     setEditingId(null)
     setForm({ ...emptyForm, jobId: form.jobId, date: today })
     setDateInput(formatDateInput(today))
   }
   const startEdit = (entry: Entry) => {
     setEditingId(entry.id)
-    setForm({ jobId: entry.jobId, date: entry.date, start: entry.start, end: entry.end, breakMinutes: String(entry.breakMinutes), overtimeMinutes: String(entry.overtimeMinutes) })
+    setForm({ jobId: entry.jobId, date: entry.date, start: entry.start, end: entry.end, breakMinutes: String(entry.breakMinutes), overtimeMinutes: String(entry.overtimeMinutes), note: entry.note ?? '' })
     setDateInput(formatDateInput(entry.date))
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -155,6 +156,17 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
           </div>
           {selectedJob?.overtimeEnabled && <p className="text-xs text-muted-foreground">Straordinari pagati {selectedJob.overtimeMultiplier}× ({formatCurrency(selectedJob.rate * selectedJob.overtimeMultiplier)}/h)</p>}
           {selectedJob?.presets.length ? <div className="flex flex-wrap gap-2">{selectedJob.presets.map((preset) => <button key={preset.id} type="button" onClick={() => setForm((current) => ({ ...current, start: preset.start, end: preset.end }))} className="rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50">{preset.start} – {preset.end}</button>)}</div> : null}
+          <label className="block text-xs text-muted-foreground">
+            Note attività
+            <textarea
+              value={form.note}
+              onChange={(event) => updateForm('note', event.target.value)}
+              placeholder="Cosa hai fatto oggi?"
+              maxLength={1000}
+              rows={3}
+              className="mt-1 w-full resize-none rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary"
+            />
+          </label>
           <Button type="submit" className="w-full" disabled={!selectedJob}>{editingId ? 'Salva modifiche' : 'Registra ora'}</Button>
         </form>
       </CardContent></Card>
@@ -163,7 +175,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
         <div className="mb-2 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attività</p><p className="text-sm text-muted-foreground">Le ultime registrazioni, senza filtri</p></div><Archive className="h-5 w-5 text-primary" /></div>
         <div className="divide-y divide-border">{visibleEntries.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nessuna attività registrata</p> : visibleEntries.map((entry) => {
           const job = jobs.find((item) => item.id === entry.jobId)
-          return <div key={entry.id} className="flex items-center justify-between gap-2 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</p><p className="text-xs text-muted-foreground">{entry.start}–{entry.end} · lavorate {formatDuration(entry.minutes)}{entry.overtimeMinutes ? ` + ${formatDuration(entry.overtimeMinutes)} extra` : ''}</p><p className="text-xs text-muted-foreground">{entry.breakMinutes ? `Pausa: ${formatDuration(entry.breakMinutes)}` : 'Pausa: nessuna'} · Minuti lavorati: {entry.minutes + entry.overtimeMinutes}</p></div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Modifica entrata" onClick={() => startEdit(entry)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label="Sposta nel cestino" onClick={() => void onDeleteEntry(entry.id)}><Trash2 className="h-4 w-4 text-rose-300" /></Button></div></div>
+          return <div key={entry.id} className="flex items-center justify-between gap-2 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</p><p className="text-xs text-muted-foreground">{entry.start}–{entry.end} · lavorate {formatDuration(entry.minutes)}{entry.overtimeMinutes ? ` + ${formatDuration(entry.overtimeMinutes)} extra` : ''}</p><p className="text-xs text-muted-foreground">{entry.breakMinutes ? `Pausa: ${formatDuration(entry.breakMinutes)}` : 'Pausa: nessuna'} · Minuti lavorati: {entry.minutes + entry.overtimeMinutes}</p>{entry.note && <p className="mt-1 line-clamp-2 text-xs italic text-muted-foreground">{entry.note}</p>}</div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Modifica entrata" onClick={() => startEdit(entry)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label="Sposta nel cestino" onClick={() => void onDeleteEntry(entry.id)}><Trash2 className="h-4 w-4 text-rose-300" /></Button></div></div>
         })}</div>
         {sortedEntries.length > 5 && <button type="button" className="mt-3 w-full text-xs font-semibold text-primary" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Mostra meno' : `Vedi tutte (${sortedEntries.length})`}</button>}
       </CardContent></Card>
