@@ -153,6 +153,35 @@ export default function App() {
     toast.success('Nome aggiornato')
   }
 
+  const updatePassword = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success('Password aggiornata')
+  }
+
+  const updateEmail = async (email: string) => {
+    const { error } = await supabase.auth.updateUser({ email })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success('Controlla entrambe le email per confermare la modifica')
+  }
+
+  const deleteAccount = async () => {
+    const { error } = await supabase.rpc('delete_own_account')
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    await db.delete()
+    await supabase.auth.signOut()
+    toast.success('Account eliminato')
+  }
+
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -369,6 +398,8 @@ export default function App() {
   }
 
   if (authLoading) return <AppLoading />
+  const isPasswordRecovery = window.location.hash.includes('type=recovery') || new URLSearchParams(window.location.search).get('recovery') === '1'
+  if (isPasswordRecovery) return <AuthView recovery />
   if (!session) return <AuthView />
 
   const createJob = async (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, color?: string) => {
@@ -774,7 +805,7 @@ export default function App() {
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} onEmailChange={updateEmail} onDeleteAccount={deleteAccount} />}
         </>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />
