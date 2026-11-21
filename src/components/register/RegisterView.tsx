@@ -29,6 +29,7 @@ interface Entry {
   overtimeMinutes: number
   overtimeRate: number
   note?: string
+  deletedAt?: string | null
 }
 
 interface RegisterViewProps {
@@ -70,6 +71,19 @@ const normalizeTimeInput = (value: string) => {
   const minutes = digits.slice(2)
   if (Number(hours) > 23 || Number(minutes) > 59) return null
   return `${hours}:${minutes}`
+}
+
+const formatTrashAge = (deletedAt?: string | null) => {
+  if (!deletedAt) return 'Nel cestino'
+  const deleted = new Date(deletedAt)
+  if (Number.isNaN(deleted.getTime())) return 'Nel cestino'
+  const elapsedMinutes = Math.max(0, Math.floor((Date.now() - deleted.getTime()) / 60000))
+  if (elapsedMinutes < 1) return 'Nel cestino da ora'
+  if (elapsedMinutes < 60) return `Nel cestino da ${elapsedMinutes} min`
+  const elapsedHours = Math.floor(elapsedMinutes / 60)
+  if (elapsedHours < 24) return `Nel cestino da ${elapsedHours} h`
+  const elapsedDays = Math.floor(elapsedHours / 24)
+  return `Nel cestino da ${elapsedDays} ${elapsedDays === 1 ? 'giorno' : 'giorni'}`
 }
 
 export const RegisterView: React.FC<RegisterViewProps> = ({
@@ -220,7 +234,10 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
         {showTrash && <div className="mt-2 divide-y divide-border">{trashEntries.map((entry) => {
           const job = jobs.find((item) => item.id === entry.jobId)
           return <div key={entry.id} className="flex items-center justify-between py-2 text-xs">
-            <span>{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</span>
+            <span>
+              <span className="block">{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</span>
+              <span className="mt-0.5 block text-[10px] text-muted-foreground">{formatTrashAge(entry.deletedAt)}</span>
+            </span>
             <span className="flex gap-2">
               <button type="button" className="trash-recover flex min-h-9 items-center gap-1 rounded-lg px-2.5 font-bold" onClick={() => setTrashConfirmation({ type: 'restore', entry })}><RotateCcw className="h-3.5 w-3.5" /> Recupera</button>
               <button type="button" className="trash-delete flex min-h-9 items-center rounded-lg px-2.5 font-bold" onClick={() => setTrashConfirmation({ type: 'delete', entry })}>Elimina</button>

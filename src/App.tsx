@@ -13,6 +13,7 @@ import { db } from '@/db'
 import { pendingMutationsCount, queueMutation, syncPendingMutations } from '@/lib/offline-sync'
 import { getDefaultJobColor } from '@/lib/job-colors'
 import { defaultGoals, loadGoals, saveGoals, type WorkGoals } from '@/lib/goals'
+import { PwaUpdateBanner } from '@/components/pwa/PwaUpdateBanner'
 
 const ReportView = lazy(() =>
   import('@/components/report/ReportView').then((module) => ({ default: module.ReportView })),
@@ -44,6 +45,22 @@ function AppLoading() {
           <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.12s]" />
           <span className="h-2 w-2 animate-bounce rounded-full bg-primary" />
         </div>
+      </div>
+    </main>
+  )
+}
+
+function AppNotFound() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background p-6 text-foreground">
+      <div className="view-enter w-full max-w-sm text-center">
+        <img src="/workflow-logo.svg" alt="WorkFlow" className="mx-auto h-20 w-20 rounded-[24px] shadow-[0_16px_40px_rgba(64,168,200,0.18)]" />
+        <p className="mt-6 text-xs font-bold uppercase tracking-[0.2em] text-primary">404</p>
+        <h1 className="mt-2 text-2xl font-black">Pagina non trovata</h1>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">Questo indirizzo non appartiene a WorkFlow. Puoi tornare alla tua ultima schermata salvata.</p>
+        <button type="button" onClick={() => { window.history.replaceState({}, '', '/'); window.location.reload() }} className="mt-5 min-h-11 w-full rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-sm">
+          Torna a WorkFlow
+        </button>
       </div>
     </main>
   )
@@ -427,6 +444,11 @@ export default function App() {
   }
 
   if (authLoading) return <AppLoading />
+  if (
+    window.location.pathname !== '/' &&
+    window.location.pathname !== '/index.html' &&
+    !window.location.pathname.endsWith('/index.html')
+  ) return <AppNotFound />
   const isPasswordRecovery = window.location.hash.includes('type=recovery') || new URLSearchParams(window.location.search).get('recovery') === '1'
   if (isPasswordRecovery) return <AuthView recovery />
   if (!session) return <AuthView />
@@ -844,6 +866,7 @@ export default function App() {
         </div>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />
+      <PwaUpdateBanner />
     </div>
   )
 }

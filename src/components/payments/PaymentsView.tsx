@@ -249,6 +249,44 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
         <Card><CardContent className="p-4"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Da ricevere questo mese</p><p className="mt-2 text-2xl font-black text-primary">{formatCurrency(dueThisMonth)}</p><p className="mt-1 text-[11px] text-muted-foreground">In base alle ore registrate</p></CardContent></Card>
       </div>
 
+      {(() => {
+        const monthTotal = receivedThisMonth + dueThisMonth
+        const paidPercent = monthTotal > 0 ? (receivedThisMonth / monthTotal) * 100 : 0
+        const topClient = (() => {
+          const totals = new Map<string, number>()
+          entries
+            .filter((entry) => entry.date.startsWith(currentMonth))
+            .forEach((entry) => {
+              const job = getJob(entry.jobId)
+              const name = job?.client || job?.name || 'Nessun cliente'
+              totals.set(name, (totals.get(name) ?? 0) + amountFor(entry))
+            })
+          return Array.from(totals.entries()).sort(([, first], [, second]) => second - first)[0]
+        })()
+        return (
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Incasso completato</p>
+                <p className="mt-2 text-xl font-black text-success">{paidPercent.toFixed(0)}%</p>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted/50">
+                  <div className="h-full rounded-full bg-success transition-[width] duration-700" style={{ width: `${paidPercent}%` }} />
+                </div>
+              </CardContent>
+            </Card>
+            {topClient && (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Cliente più redditizio</p>
+                  <p className="mt-2 truncate text-sm font-black">{topClient[0]}</p>
+                  <p className="mt-1 text-sm font-bold text-success">{formatCurrency(topClient[1])}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )
+      })()}
+
       <Card className="border-primary/40">
         <CardContent className="space-y-4 p-4">
           <div className="flex items-start gap-3">

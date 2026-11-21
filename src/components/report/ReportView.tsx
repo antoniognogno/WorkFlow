@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, Target, CalendarCheck, Trophy, Clock3, WalletCards } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, Target, CalendarCheck, Trophy, Clock3, WalletCards, Award, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/select'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -74,6 +74,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
     localStorage.getItem('workflow-report-view') === 'detail' ? 'detail' : 'dashboard',
   )
   const [goals] = useState(() => loadGoals())
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [period, setPeriod] = useState<Period>('last30')
   const [offset, setOffset] = useState(0)
   const [customFrom, setCustomFrom] = useState('')
@@ -228,6 +229,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       monthEntries,
       monthMinutes,
       monthPay,
+      averageHoursPerDay: workdays > 0 ? monthMinutes / 60 / workdays : 0,
+      forecastPay: (() => {
+        const elapsedDays = Math.max(1, now.getDate())
+        const dailyAverage = monthPay / elapsedDays
+        return dailyAverage * monthEnd.getDate()
+      })(),
       paidPay,
       outstandingPay: Math.max(0, monthPay - paidPay),
       workdays,
@@ -238,6 +245,48 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       remainingEarnings,
       jobProgress,
       monthLabel: now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
+      weekRemainingHours: (() => {
+        const monday = new Date(now)
+        monday.setHours(12, 0, 0, 0)
+        monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+        const sunday = new Date(monday)
+        sunday.setDate(sunday.getDate() + 6)
+        const weeklyEntries = entries.filter((entry) =>
+          entry.date >= monday.toISOString().slice(0, 10) &&
+          entry.date <= sunday.toISOString().slice(0, 10),
+        )
+        const weeklyMinutes = weeklyEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+        const remainingDays = Math.max(1, 7 - ((now.getDay() + 6) % 7))
+        return {
+          remainingHours: Math.max(0, goals.weeklyHours - weeklyMinutes / 60),
+          perDay: Math.max(0, (goals.weeklyHours - weeklyMinutes / 60) / remainingDays),
+          completed: weeklyMinutes / 60 >= goals.weeklyHours,
+        }
+      })(),
+      topClient: (() => {
+        const totals = new Map<string, number>()
+        monthEntries.forEach((entry) => {
+          const client = getJob(entry.jobId).client || 'Nessun cliente'
+          const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
+          totals.set(client, (totals.get(client) ?? 0) + amount)
+        })
+        return Array.from(totals.entries()).sort(([, first], [, second]) => second - first)[0] ?? null
+      })(),
+      bestMonth: (() => {
+        const totals = new Map<string, number>()
+        entries.forEach((entry) => {
+          const month = entry.date.slice(0, 7)
+          const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
+          totals.set(month, (totals.get(month) ?? 0) + amount)
+        })
+        const best = Array.from(totals.entries()).sort(([, first], [, second]) => second - first)[0]
+        if (!best) return null
+        const [year, month] = best[0].split('-').map(Number)
+        return {
+          label: new Date(year, month - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
+          amount: best[1],
+        }
+      })(),
     }
   }, [entries, goals, jobs])
 
@@ -353,6 +402,114 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             </Card>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Media giornaliera</p>
+                <p className="mt-2 text-xl font-black">{dashboard.averageHoursPerDay.toFixed(1)} h</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">nelle giornate lavorate</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground">Previsione mese</p>
+                <p className="mt-2 text-xl font-black text-success">{formatCurrency(dashboard.forecastPay)}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">basata sul ritmo attuale</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {(() => {
+            const selected = new Date(`${selectedCalendarDate}T12:00:00`)
+            const year = selected.getFullYear()
+            const month = selected.getMonth()
+            const firstDay = new Date(year, month, 1)
+            const startOffset = (firstDay.getDay() + 6) % 7
+            const daysInMonth = new Date(year, month + 1, 0).getDate()
+            const entriesByDate = new Map<string, typeof dashboard.monthEntries>()
+            dashboard.monthEntries.forEach((entry) => {
+              const dayEntries = entriesByDate.get(entry.date) ?? []
+              dayEntries.push(entry)
+              entriesByDate.set(entry.date, dayEntries)
+            })
+            const selectedEntries = entriesByDate.get(selectedCalendarDate) ?? []
+            const selectedMinutes = selectedEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+            const selectedPay = selectedEntries.reduce((sum, entry) =>
+              sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate),
+            0)
+            return (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">Calendario mensile</p>
+                      <p className="text-[11px] text-muted-foreground capitalize">
+                        {selected.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <CalendarCheck className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="grid grid-cols-7 gap-1 text-center">
+                    {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((day, index) => (
+                      <span key={`${day}-${index}`} className="pb-1 text-[10px] font-bold text-muted-foreground">{day}</span>
+                    ))}
+                    {Array.from({ length: startOffset }, (_, index) => <span key={`empty-${index}`} />)}
+                    {Array.from({ length: daysInMonth }, (_, index) => {
+                      const day = index + 1
+                      const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                      const dayEntries = entriesByDate.get(date) ?? []
+                      const active = selectedCalendarDate === date
+                      const dayMinutes = dayEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+                      return (
+                        <button
+                          key={date}
+                          type="button"
+                          onClick={() => setSelectedCalendarDate(date)}
+                          className={`relative flex aspect-square min-h-9 flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all ${
+                            active ? 'bg-primary text-primary-foreground shadow-md' : dayEntries.length ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-surface-raised'
+                          }`}
+                          aria-label={`${day}, ${dayEntries.length} registrazioni`}
+                        >
+                          <span>{day}</span>
+                          {dayMinutes > 0 && <span className={`mt-0.5 h-1 w-1 rounded-full ${active ? 'bg-primary-foreground' : 'bg-primary'}`} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="mt-3 flex items-center justify-between rounded-xl border border-border bg-background/50 px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-semibold">{selected.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">{selectedEntries.length} registrazioni · {formatDuration(selectedMinutes)}</p>
+                    </div>
+                    <p className="text-sm font-black text-success">{formatCurrency(selectedPay)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          <div className="grid grid-cols-2 gap-3">
+            {dashboard.topClient && (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Cliente più redditizio</p>
+                  <p className="mt-2 truncate text-sm font-black">{dashboard.topClient[0]}</p>
+                  <p className="mt-1 text-sm font-bold text-success">{formatCurrency(dashboard.topClient[1])}</p>
+                </CardContent>
+              </Card>
+            )}
+            {dashboard.bestMonth && (
+              <Card>
+                <CardContent className="p-4">
+                  <Award className="h-4 w-4 text-amber-500" />
+                  <p className="mt-2 text-xs text-muted-foreground">Mese migliore</p>
+                  <p className="mt-1 truncate text-sm font-black capitalize">{dashboard.bestMonth.label}</p>
+                  <p className="mt-1 text-sm font-bold text-success">{formatCurrency(dashboard.bestMonth.amount)}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -374,6 +531,29 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               </div>
             </CardContent>
           </Card>
+
+          {goals.weeklyHours > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold">Obiettivo settimanale intelligente</p>
+                    {dashboard.weekRemainingHours.completed ? (
+                      <p className="mt-1 text-xs font-semibold text-success">Obiettivo raggiunto. Ottimo ritmo questa settimana.</p>
+                    ) : (
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Mancano <strong className="text-foreground">{dashboard.weekRemainingHours.remainingHours.toFixed(1)} h</strong>.
+                        {' '}Lavora circa <strong className="text-foreground">{dashboard.weekRemainingHours.perDay.toFixed(1)} h al giorno</strong> nei giorni rimanenti.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {goals.monthlyHours > 0 && (
             <Card>
