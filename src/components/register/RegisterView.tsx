@@ -197,8 +197,8 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
           return <div key={entry.id} className="flex items-center justify-between py-2 text-xs">
             <span>{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</span>
             <span className="flex gap-2">
-              <button type="button" className="flex items-center gap-1 text-cyan-300" onClick={() => setTrashConfirmation({ type: 'restore', entry })}><RotateCcw className="h-3 w-3" /> Recupera</button>
-              <button type="button" className="text-rose-300" onClick={() => setTrashConfirmation({ type: 'delete', entry })}>Elimina</button>
+              <button type="button" className="trash-recover flex min-h-9 items-center gap-1 rounded-lg px-2.5 font-bold" onClick={() => setTrashConfirmation({ type: 'restore', entry })}><RotateCcw className="h-3.5 w-3.5" /> Recupera</button>
+              <button type="button" className="trash-delete flex min-h-9 items-center rounded-lg px-2.5 font-bold" onClick={() => setTrashConfirmation({ type: 'delete', entry })}>Elimina</button>
             </span>
           </div>
         })}</div>}
@@ -211,7 +211,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
           <Card className="w-full max-w-md animate-[view-enter_180ms_ease-out]">
             <CardContent className="space-y-4 p-5">
               <div className="flex items-start gap-3">
-                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${trashConfirmation.type === 'delete' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${trashConfirmation.type === 'delete' ? 'trash-delete' : 'trash-recover'}`}>
                   {trashConfirmation.type === 'delete' ? <Trash2 className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
                 </div>
                 <div>
@@ -243,7 +243,9 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline" onClick={() => setTrashConfirmation(null)}>Annulla</Button>
                 <Button
-                  className={trashConfirmation.type === 'delete' ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+                  className={trashConfirmation.type === 'delete'
+                    ? 'trash-delete min-h-11 border-0'
+                    : 'trash-recover min-h-11 border-0'}
                   onClick={() => void confirmTrashAction()}
                 >
                   {trashConfirmation.type === 'delete' ? 'Elimina' : 'Recupera'}

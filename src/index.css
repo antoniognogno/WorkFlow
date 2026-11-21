@@ -38,6 +38,15 @@
   --surface-raised: #e9f1f5;
   --shadow-soft: 0 10px 28px rgba(41, 75, 93, 0.12);
   --shadow-focus: 0 0 0 3px rgba(38, 116, 145, 0.2);
+  --destructive: #c83c43;
+  --destructive-foreground: #ffffff;
+  --success: #287c68;
+}
+
+[data-theme="dark"] {
+  --destructive: #ef6a70;
+  --destructive-foreground: #1a090a;
+  --success: #79b8ad;
 }
 
 html, body {
@@ -162,6 +171,54 @@ body {
 .chart-legend-item:active {
   border-color: var(--border);
   background: var(--surface-raised);
+}
+
+.trash-recover {
+  color: #176b52;
+  background: #dff3ea;
+  border: 1px solid #90cbb6;
+  box-shadow: 0 4px 12px rgba(40, 124, 104, 0.12);
+}
+
+.trash-recover:hover,
+.trash-recover:active {
+  color: #ffffff;
+  background: #287c68;
+  border-color: #287c68;
+}
+
+.trash-delete {
+  color: #ffffff;
+  background: #c83c43;
+  border: 1px solid #a92f35;
+  box-shadow: 0 4px 12px rgba(200, 60, 67, 0.18);
+}
+
+.trash-delete:hover,
+.trash-delete:active {
+  background: #a92f35;
+  border-color: #92272c;
+}
+
+[data-theme="dark"] .trash-recover {
+  color: #b7ebd9;
+  background: rgba(121, 184, 173, 0.16);
+  border-color: rgba(121, 184, 173, 0.45);
+  box-shadow: none;
+}
+
+[data-theme="dark"] .trash-recover:hover,
+[data-theme="dark"] .trash-recover:active {
+  color: #07130f;
+  background: #79b8ad;
+  border-color: #79b8ad;
+}
+
+[data-theme="dark"] .trash-delete {
+  color: #ffffff;
+  background: #c94c53;
+  border-color: #ef6a70;
+  box-shadow: 0 4px 14px rgba(239, 106, 112, 0.12);
 }
 
 button, input, textarea, select {
