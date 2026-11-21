@@ -40,6 +40,34 @@ interface ReportViewProps {
 
 type Period = 'last7' | 'last30' | 'week' | 'month' | 'quarter' | 'semester' | 'year' | 'custom'
 
+interface JobChartTooltipProps {
+  active?: boolean
+  payload?: Array<{
+    value?: number
+    payload?: {
+      name?: string
+      value?: number
+      color?: string
+    }
+  }>
+}
+
+const JobChartTooltip = ({ active, payload }: JobChartTooltipProps) => {
+  const item = payload?.[0]?.payload
+  if (!active || !item) return null
+
+  return (
+    <div className="chart-touch-tooltip min-w-36 rounded-2xl border border-border/90 bg-card px-3 py-2.5 shadow-[0_12px_32px_rgba(0,0,0,0.28)]">
+      <p className="mb-1 text-xs font-bold" style={{ color: item.color || 'var(--foreground)' }}>
+        {item.name || 'Lavoro'}
+      </p>
+      <p className="text-base font-black text-foreground">
+        {formatCurrency(Number(payload[0].value ?? item.value ?? 0))}
+      </p>
+    </div>
+  )
+}
+
 export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const [period, setPeriod] = useState<Period>('last30')
   const [offset, setOffset] = useState(0)
@@ -366,12 +394,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                   <YAxis type="category" dataKey="name" width={82} tick={{ fill: 'var(--muted)', fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(value) => String(value).slice(0, 11)} />
                   <Tooltip
                     cursor={{ fill: 'var(--primary)', fillOpacity: 0.06 }}
-                    contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
-                    labelStyle={{ color: 'var(--foreground)' }}
-                    itemStyle={{ color: 'var(--foreground)' }}
-                    formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
+                    content={<JobChartTooltip />}
+                    isAnimationActive={false}
                   />
-                  <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+                  <Bar dataKey="value" radius={[0, 8, 8, 0]} activeBar={false} isAnimationActive>
                     {breakdownData.map((item) => (
                       <Cell key={item.name} fill={item.color} />
                     ))}
@@ -392,12 +418,10 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Tooltip
-                    contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
-                    labelStyle={{ color: 'var(--foreground)' }}
-                    itemStyle={{ color: 'var(--foreground)' }}
-                    formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
+                    content={<JobChartTooltip />}
+                    isAnimationActive={false}
                   />
-                  <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} labelLine={false}>
+                  <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} labelLine={false} activeShape={false} isAnimationActive>
                     {breakdownData.map((item) => (
                       <Cell key={item.name} fill={item.color} />
                     ))}
@@ -407,10 +431,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               {breakdownData.map((item) => (
-                <div key={item.name} className="min-w-0 text-[11px] text-muted-foreground">
-                  <span className="block truncate">{item.name}</span>
+                <button
+                  key={item.name}
+                  type="button"
+                  className="chart-legend-item min-w-0 rounded-xl px-2 py-1.5 text-left text-[11px] transition-colors active:scale-[0.98]"
+                  onClick={() => toast(`${item.name} · ${formatCurrency(item.value)}`, { icon: '●', style: { color: item.color } })}
+                  aria-label={`${item.name}, ${formatCurrency(item.value)}`}
+                >
+                  <span className="block truncate font-semibold" style={{ color: item.color }}>{item.name}</span>
                   <strong className="text-foreground">{formatCurrency(item.value)}</strong>
-                </div>
+                </button>
               ))}
             </div>
           </CardContent>

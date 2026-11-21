@@ -127,6 +127,43 @@ body {
   background: rgba(122, 166, 189, 0.35);
 }
 
+.recharts-wrapper,
+.recharts-wrapper svg,
+.recharts-surface,
+.recharts-sector,
+.recharts-bar-rectangle,
+.recharts-rectangle {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
+.recharts-surface:focus,
+.recharts-sector:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.chart-touch-tooltip {
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  touch-action: manipulation;
+  pointer-events: none;
+}
+
+.chart-legend-item {
+  border: 1px solid transparent;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chart-legend-item:active {
+  border-color: var(--border);
+  background: var(--surface-raised);
+}
+
 button, input, textarea, select {
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
