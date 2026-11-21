@@ -1,35 +1,68 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { useState } from 'react'
+import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check } from 'lucide-react'
 import type { Theme } from '@/App'
 import { Select } from '@/components/ui/select'
 
 interface ProfileViewProps {
   email: string
+  displayName: string
   theme: Theme
   onThemeChange: (theme: Theme) => void
   onSignOut: () => void
+  onDisplayNameChange: (displayName: string) => Promise<void>
   jobsCount: number
   entriesCount: number
 }
 
-export function ProfileView({ email, theme, onThemeChange, onSignOut, jobsCount, entriesCount }: ProfileViewProps) {
+export function ProfileView({ email, displayName, theme, onThemeChange, onSignOut, onDisplayNameChange, jobsCount, entriesCount }: ProfileViewProps) {
+  const [name, setName] = useState(displayName)
+  const [editingName, setEditingName] = useState(false)
+  const [savingName, setSavingName] = useState(false)
+
+  const saveName = async () => {
+    const nextName = name.trim()
+    if (!nextName) return
+    setSavingName(true)
+    await onDisplayNameChange(nextName)
+    setSavingName(false)
+    setEditingName(false)
+  }
+
   return (
-    <div className="space-y-4 pb-24">
+    <div className="view-enter space-y-4 pb-24">
       <div>
         <p className="text-sm text-muted-foreground">Il tuo profilo</p>
-        <h2 className="text-2xl font-black">Ciao, {email}</h2>
+        <h2 className="text-2xl font-black">Ciao, {displayName}</h2>
       </div>
       <Card>
         <CardContent className="space-y-4 p-5">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-              <UserRound className="h-6 w-6" />
+              <span className="text-lg font-black">{displayName.charAt(0).toUpperCase() || <UserRound className="h-6 w-6" />}</span>
             </div>
-            <div>
-              <p className="font-semibold">Account personale</p>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">{displayName}</p>
               <p className="flex items-center gap-1 text-sm text-muted-foreground"><Mail className="h-3.5 w-3.5" />{email}</p>
             </div>
+          </div>
+          <div className="rounded-2xl border border-border/80 bg-background/50 p-3">
+            <label htmlFor="display-name" className="mb-2 block text-xs font-semibold text-muted-foreground">Nome visualizzato</label>
+            {editingName ? (
+              <div className="flex gap-2">
+                <Input id="display-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={40} />
+                <Button size="icon" onClick={() => void saveName()} disabled={savingName || !name.trim()} aria-label="Salva nome">
+                  <Check className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <Button variant="outline" className="w-full justify-between" onClick={() => setEditingName(true)}>
+                <span>{displayName}</span>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <div className="rounded-2xl border border-border/80 bg-background/50 p-3">
             <label htmlFor="theme-select" className="mb-2 block text-xs font-semibold text-muted-foreground">Aspetto dell’app</label>

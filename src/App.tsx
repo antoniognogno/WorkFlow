@@ -1,15 +1,18 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import { Toaster, toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { AuthView } from '@/components/auth/AuthView'
 import { BottomNav, type TabType } from '@/components/layout/BottomNav'
 import { RegisterView } from '@/components/register/RegisterView'
-import { ReportView } from '@/components/report/ReportView'
 import { JobsView } from '@/components/jobs/JobsView'
 import { MessageView } from '@/components/message/MessageView'
 import { ProfileView } from '@/components/profile/ProfileView'
 import { PaymentsView } from '@/components/payments/PaymentsView'
 import { Wifi, WifiOff } from 'lucide-react'
+
+const ReportView = lazy(() =>
+  import('@/components/report/ReportView').then((module) => ({ default: module.ReportView })),
+)
 
 export type Theme = 'dark' | 'light'
 
@@ -124,6 +127,21 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [trashEntries, setTrashEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
+  const displayName = session?.user.user_metadata?.display_name
+    || localStorage.getItem('workflow-display-name')
+    || session?.user.email?.split('@')[0]
+    || 'utente'
+
+  const updateDisplayName = async (nextName: string) => {
+    const { data, error } = await supabase.auth.updateUser({ data: { display_name: nextName } })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    localStorage.setItem('workflow-display-name', nextName)
+    if (data.user) setSession((current) => current ? { ...current, user: data.user } : current)
+    toast.success('Nome aggiornato')
+  }
 
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
@@ -444,18 +462,38 @@ export default function App() {
             </span>
           </div>
           <button type="button" className="max-w-36 truncate rounded-lg px-2 py-1 text-right text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={() => changeTab('profile')}>
-            Ciao, {session.user.email ?? 'utente'}
+            Ciao, {displayName}
           </button>
         </div>
       </header>
       <main className="mx-auto w-full max-w-md flex-1 p-4">
-        {loading ? <p className="py-12 text-center text-sm text-muted-foreground">Caricamento dati…</p> : <>
+        {loading ? (
+          <div className="flex min-h-48 items-center justify-center" role="status" aria-label="Caricamento dati">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary [animation-delay:-0.24s]" />
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary [animation-delay:-0.12s]" />
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" />
+            </div>
+          </div>
+        ) : <>
           {currentTab === 'reg' && <RegisterView jobs={jobs} entries={entries} trashEntries={trashEntries} onAddEntry={addEntry} onUpdateEntry={updateEntry} onDeleteEntry={deleteEntry} onRestoreEntry={restoreEntry} onPermanentlyDeleteEntry={permanentlyDeleteEntry} onCreateJob={createJob} />}
-          {currentTab === 'rep' && <ReportView jobs={jobs} entries={entries} />}
+          {currentTab === 'rep' && (
+            <Suspense fallback={
+              <div className="view-enter flex min-h-48 items-center justify-center" role="status" aria-label="Caricamento report">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary [animation-delay:-0.24s]" />
+                  <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary [animation-delay:-0.12s]" />
+                  <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" />
+                </div>
+              </div>
+            }>
+              <ReportView jobs={jobs} entries={entries} />
+            </Suspense>
+          )}
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} />}
         </>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />

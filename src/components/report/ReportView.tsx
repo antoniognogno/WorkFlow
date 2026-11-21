@@ -1,11 +1,12 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Share2, Copy } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/select'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 interface Job {
   id: string
@@ -83,6 +84,47 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
     breakdown[key] = (breakdown[key] || 0) + (e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate)
   })
 
+  const trendData = useMemo(() => {
+    const grouped = new Map<string, { hours: number; earnings: number }>()
+    filteredEntries.forEach((entry) => {
+      const current = grouped.get(entry.date) ?? { hours: 0, earnings: 0 }
+      const minutes = entry.minutes + entry.overtimeMinutes
+      current.hours += minutes / 60
+      current.earnings += (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
+      grouped.set(entry.date, current)
+    })
+    return Array.from(grouped.entries())
+      .sort(([first], [second]) => first.localeCompare(second))
+      .map(([date, values]) => ({
+        date: new Date(`${date}T12:00:00`).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }),
+        hours: Number(values.hours.toFixed(2)),
+        earnings: Number(values.earnings.toFixed(2)),
+      }))
+  }, [filteredEntries])
+
+  const breakdownData = Object.entries(breakdown)
+    .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+    .sort((first, second) => second.value - first.value)
+    .slice(0, 6)
+
+  const comparison = useMemo(() => {
+    const start = new Date(`${startDate}T12:00:00`)
+    const end = new Date(`${endDate}T12:00:00`)
+    const dayCount = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1)
+    const previousEnd = new Date(start)
+    previousEnd.setDate(previousEnd.getDate() - 1)
+    const previousStart = new Date(previousEnd)
+    previousStart.setDate(previousStart.getDate() - dayCount + 1)
+    const previousFrom = previousStart.toISOString().slice(0, 10)
+    const previousTo = previousEnd.toISOString().slice(0, 10)
+    const previousEntries = entries.filter((entry) => entry.date >= previousFrom && entry.date <= previousTo)
+    const previousPay = previousEntries.reduce((sum, entry) =>
+      sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate),
+    0)
+    const variation = previousPay > 0 ? ((totalPay - previousPay) / previousPay) * 100 : totalPay > 0 ? 100 : 0
+    return { previousPay, variation }
+  }, [entries, endDate, startDate, totalPay])
+
   // Generatore testo messaggio
   const generateMessage = () => {
     const lines = filteredEntries.map((e) => {
@@ -109,10 +151,39 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
     window.open(`https://wa.me/?text=${encodeURIComponent(generateMessage())}`, '_blank')
   }
 
+  const handleExportCsv = () => {
+    const header = ['Data', 'Inizio', 'Fine', 'Lavoro', 'Cliente', 'Ore', 'Straordinari', 'Compenso']
+    const rows = filteredEntries.map((entry) => {
+      const job = getJob(entry.jobId)
+      const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
+      return [
+        entry.date,
+        entry.start,
+        entry.end,
+        job.name,
+        job.client,
+        (entry.minutes / 60).toFixed(2),
+        (entry.overtimeMinutes / 60).toFixed(2),
+        amount.toFixed(2),
+      ]
+    })
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';'))
+      .join('\n')
+    const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `workflow-report-${startDate}-${endDate}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+    toast.success('Report CSV esportato')
+  }
+
   const uniqueClients = Array.from(new Set(jobs.map((j) => j.client).filter(Boolean)))
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="view-enter space-y-4 pb-24">
       {/* Selettore Periodo */}
       <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
         {[
@@ -212,6 +283,114 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
         </CardContent>
       </Card>
 
+      <div className="grid grid-cols-2 gap-3">
+        <Card className="overflow-hidden">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {comparison.variation >= 0 ? <TrendingUp className="h-4 w-4 text-success" /> : <TrendingDown className="h-4 w-4 text-destructive" />}
+              Rispetto al periodo precedente
+            </div>
+            <p className={`mt-2 text-xl font-black ${comparison.variation >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {comparison.variation >= 0 ? '+' : ''}{comparison.variation.toFixed(1)}%
+            </p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Prima: {formatCurrency(comparison.previousPay)}</p>
+          </CardContent>
+        </Card>
+        <Card className="overflow-hidden">
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Medie giornaliere</p>
+            <p className="mt-2 text-xl font-black">{formatDuration(trendData.length ? Math.round(totalMinutes / trendData.length) : 0)}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">ore / giorno attivo</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {trendData.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold">Andamento guadagni</p>
+                <p className="text-[11px] text-muted-foreground">Entrate nel periodo selezionato</p>
+              </div>
+            </div>
+            <div className="h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                  <defs>
+                    <linearGradient id="earningsGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#79b8ad" stopOpacity={0.42} />
+                      <stop offset="95%" stopColor="#79b8ad" stopOpacity={0.03} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="var(--border)" strokeOpacity={0.55} vertical={false} />
+                  <XAxis dataKey="date" tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={18} />
+                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ stroke: 'var(--primary)', strokeOpacity: 0.35 }}
+                    contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
+                  />
+                  <Area type="monotone" dataKey="earnings" stroke="#79b8ad" strokeWidth={3} fill="url(#earningsGradient)" activeDot={{ r: 5, strokeWidth: 2, fill: '#79b8ad' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {trendData.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-bold">Ore registrate</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Ore lavorate giorno per giorno</p>
+            <div className="mt-3 h-40 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                  <CartesianGrid stroke="var(--border)" strokeOpacity={0.55} vertical={false} />
+                  <XAxis dataKey="date" tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={18} />
+                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    cursor={{ fill: 'var(--primary)', fillOpacity: 0.06 }}
+                    contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    formatter={(value) => [`${Number(value).toFixed(1)} h`, 'Ore']}
+                  />
+                  <Bar dataKey="hours" fill="#7aa6bd" radius={[8, 8, 2, 2]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {breakdownData.length > 0 && (
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-sm font-bold">Ripartizione per lavoro</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Incidenza sul guadagno totale</p>
+            <div className="mt-2 h-44 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
+                  />
+                  <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} fill="#7aa6bd" labelLine={false} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {breakdownData.map((item) => (
+                <div key={item.name} className="min-w-0 text-[11px] text-muted-foreground">
+                  <span className="block truncate">{item.name}</span>
+                  <strong className="text-foreground">{formatCurrency(item.value)}</strong>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardContent className="space-y-2 p-4">
           <label htmlFor="report-total-template" className="text-xs font-semibold text-muted-foreground">
@@ -268,9 +447,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       </Card>
 
       {/* Azioni Rapide Condivisione */}
-      <div className="flex gap-2">
+      <div className="grid grid-cols-[1fr_auto_auto] gap-2">
         <Button className="flex-1 bg-[#25D366] hover:bg-[#20ba5a] text-white font-semibold flex items-center justify-center gap-2" onClick={handleWhatsApp}>
           <Share2 className="h-4 w-4" /> Invia su WhatsApp
+        </Button>
+        <Button variant="outline" onClick={handleExportCsv} className="px-3" aria-label="Esporta report CSV">
+          <Download className="h-4 w-4" />
         </Button>
         <Button variant="outline" onClick={handleCopy} className="px-4">
           <Copy className="h-4 w-4" />
