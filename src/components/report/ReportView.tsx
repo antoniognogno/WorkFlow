@@ -399,6 +399,19 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             <div>
               <p className="text-sm text-muted-foreground">Riepilogo mensile</p>
               <h2 className="text-2xl font-black capitalize">{dashboard.monthLabel}</h2>
+              <input
+                type="month"
+                aria-label="Seleziona mese dashboard"
+                value={`${new Date(new Date().setMonth(new Date().getMonth() + dashboardMonthOffset)).getFullYear()}-${String(new Date(new Date().setMonth(new Date().getMonth() + dashboardMonthOffset)).getMonth() + 1).padStart(2, '0')}`}
+                onChange={(event) => {
+                  const [year, month] = event.target.value.split('-').map(Number)
+                  if (!year || !month) return
+                  const now = new Date()
+                  const offset = (year - now.getFullYear()) * 12 + (month - 1 - now.getMonth())
+                  setDashboardMonthOffset(offset)
+                }}
+                className="mt-2 h-9 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground outline-none"
+              />
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -498,13 +511,21 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                       const dayEntries = entriesByDate.get(date) ?? []
                       const active = selectedCalendarDate === date
                       const dayMinutes = dayEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+                      const today = new Date()
+                      const isToday = date === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
                       return (
                         <button
                           key={date}
                           type="button"
                           onClick={() => setSelectedCalendarDate(date)}
                           className={`relative flex aspect-square min-h-9 flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all ${
-                            active ? 'bg-primary text-primary-foreground shadow-md' : dayEntries.length ? 'bg-primary/10 text-foreground' : 'text-muted-foreground hover:bg-surface-raised'
+                            active
+                              ? 'bg-primary text-primary-foreground shadow-md'
+                              : isToday
+                                ? 'border border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                                : dayEntries.length
+                                  ? 'bg-primary/10 text-foreground'
+                                  : 'text-muted-foreground hover:bg-surface-raised'
                           }`}
                           aria-label={`${day}, ${dayEntries.length} registrazioni`}
                         >
@@ -661,7 +682,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
         ]}
       />
       <label className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs text-muted-foreground">
-        <input type="checkbox" checked={groupSameName} onChange={(event) => setGroupSameName(event.target.checked)} className="h-4 w-4 accent-primary" />
+        <input type="checkbox" checked={groupSameName} onChange={(event) => setGroupSameName(event.target.checked)} className="h-5 w-5 shrink-0 accent-primary" />
         Raggruppa nel riepilogo i lavori con lo stesso nome
       </label>
 
