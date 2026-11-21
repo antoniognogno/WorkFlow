@@ -215,7 +215,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               setOffset(0)
             }}
             className={`rounded-lg px-1 py-2 text-[11px] font-semibold whitespace-nowrap transition-all ${
-              period === p ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+              period === p ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:text-foreground hover:bg-surface-raised'
             }`}
           >
             {label}

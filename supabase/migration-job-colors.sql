@@ -5,7 +5,7 @@ WITH ranked_jobs AS (
     id,
     (ROW_NUMBER() OVER (ORDER BY created_at NULLS LAST, id) - 1) % 8 AS color_index
   FROM public.jobs
-  WHERE color IS NULL OR btrim(color) = ''
+  WHERE color IS NULL OR btrim(color) = '' OR color = '#7aa6bd'
 )
 UPDATE public.jobs AS jobs
 SET color = CASE ranked_jobs.color_index

@@ -164,15 +164,6 @@ export default function App() {
     toast.success('Password aggiornata')
   }
 
-  const updateEmail = async (email: string) => {
-    const { error } = await supabase.auth.updateUser({ email })
-    if (error) {
-      toast.error(error.message)
-      return
-    }
-    toast.success('Controlla entrambe le email per confermare la modifica')
-  }
-
   useEffect(() => {
     void supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
@@ -805,7 +796,7 @@ export default function App() {
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} onEmailChange={updateEmail} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} />}
         </>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />

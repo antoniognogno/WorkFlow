@@ -165,7 +165,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
             <div className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-primary" /><p className="text-sm font-bold">Intervallo estratto conto</p></div>
             <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
               {([['day', 'Giorno'], ['week', 'Settimana'], ['month', 'Mese'], ['quarter', 'Trim.'], ['semester', '6 mesi'], ['year', 'Anno'], ['custom', 'Date']] as const).map(([value, label]) => (
-                <button key={value} type="button" onClick={() => { setStatementPeriod(value); setStatementOffset(0) }} className={`rounded-lg px-1 py-2 text-[11px] font-semibold ${statementPeriod === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+                <button key={value} type="button" onClick={() => { setStatementPeriod(value); setStatementOffset(0) }} className={`rounded-lg px-1 py-2 text-[11px] font-semibold ${statementPeriod === value ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-surface-raised hover:text-foreground'}`}>
                   {label}
                 </button>
               ))}
@@ -287,7 +287,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
           <div className="flex items-center gap-2"><CalendarRange className="h-4 w-4 text-primary" /><p className="text-sm font-bold">Periodo</p></div>
           <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
             {([['last30', '30 giorni'], ['month', 'Mese'], ['quarter', 'Trim.'], ['custom', 'Date']] as const).map(([value, label]) => (
-              <button key={value} type="button" onClick={() => { setPeriod(value); setOffset(0) }} className={`rounded-lg px-1 py-2 text-[11px] font-semibold ${period === value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}>
+              <button key={value} type="button" onClick={() => { setPeriod(value); setOffset(0) }} className={`rounded-lg px-1 py-2 text-[11px] font-semibold ${period === value ? 'bg-primary text-primary-foreground shadow-md' : 'text-muted-foreground hover:bg-surface-raised hover:text-foreground'}`}>
                 {label}
               </button>
             ))}

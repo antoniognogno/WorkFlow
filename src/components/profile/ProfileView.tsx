@@ -2,7 +2,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
-import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check, Eye, EyeOff, KeyRound } from 'lucide-react'
+import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check, Eye, EyeOff, KeyRound, ArrowLeft, ChevronRight } from 'lucide-react'
 import type { Theme } from '@/App'
 import { Select } from '@/components/ui/select'
 
@@ -14,20 +14,19 @@ interface ProfileViewProps {
   onSignOut: () => void
   onDisplayNameChange: (displayName: string) => Promise<void>
   onPasswordChange: (password: string) => Promise<void>
-  onEmailChange: (email: string) => Promise<void>
   jobsCount: number
   entriesCount: number
 }
 
-export function ProfileView({ email, displayName, theme, onThemeChange, onSignOut, onDisplayNameChange, onPasswordChange, onEmailChange, jobsCount, entriesCount }: ProfileViewProps) {
+export function ProfileView({ email, displayName, theme, onThemeChange, onSignOut, onDisplayNameChange, onPasswordChange, jobsCount, entriesCount }: ProfileViewProps) {
   const [name, setName] = useState(displayName)
   const [editingName, setEditingName] = useState(false)
   const [savingName, setSavingName] = useState(false)
   const [newPassword, setNewPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
-  const [newEmail, setNewEmail] = useState(email)
-  const [changingEmail, setChangingEmail] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordView, setPasswordView] = useState(false)
 
   const saveName = async () => {
     const nextName = name.trim()
@@ -39,21 +38,72 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
   }
 
   const savePassword = async () => {
-    if (newPassword.length < 6) return
+    if (newPassword.length < 6 || newPassword !== confirmPassword) return
     setChangingPassword(true)
     await onPasswordChange(newPassword)
     setNewPassword('')
+    setConfirmPassword('')
     setChangingPassword(false)
   }
 
-  const saveEmail = async () => {
-    if (!newEmail.trim()) return
-    setChangingEmail(true)
-    await onEmailChange(newEmail.trim())
-    setChangingEmail(false)
+  if (passwordView) {
+    return (
+      <div className="view-enter space-y-4 pb-24">
+        <button type="button" onClick={() => setPasswordView(false)} className="flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Profilo
+        </button>
+        <div>
+          <p className="text-sm text-muted-foreground">Sicurezza account</p>
+          <h2 className="text-2xl font-black">Cambia password</h2>
+        </div>
+        <Card>
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+              <KeyRound className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <p className="text-xs leading-relaxed text-muted-foreground">Scegli una password lunga almeno 6 caratteri. Per sicurezza, la password attuale non viene mostrata o memorizzata nell’app.</p>
+            </div>
+            <label className="block text-xs font-semibold text-muted-foreground" htmlFor="new-password">
+              Nuova password
+              <div className="relative mt-2">
+                <Input
+                  id="new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(event) => setNewPassword(event.target.value)}
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="pr-12"
+                  placeholder="Almeno 6 caratteri"
+                />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground" aria-label={showPassword ? 'Nascondi password' : 'Mostra password'}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </label>
+            <label className="block text-xs font-semibold text-muted-foreground" htmlFor="confirm-password">
+              Conferma nuova password
+              <Input
+                id="confirm-password"
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                minLength={6}
+                autoComplete="new-password"
+                className="mt-2"
+                placeholder="Ripeti la password"
+              />
+            </label>
+            {confirmPassword && confirmPassword !== newPassword && (
+              <p className="text-xs font-semibold text-destructive">Le password non coincidono</p>
+            )}
+            <Button className="w-full" onClick={() => void savePassword()} disabled={changingPassword || newPassword.length < 6 || newPassword !== confirmPassword}>
+              <KeyRound className="mr-2 h-4 w-4" /> Aggiorna password
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
-
-
   return (
     <div className="view-enter space-y-4 pb-24">
       <div>
@@ -96,25 +146,11 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
               options={[{ value: 'dark', label: '🌙 Modalità scura' }, { value: 'light', label: '☀️ Modalità chiara' }]}
             />
           </div>
-          <div className="rounded-2xl border border-border/80 bg-background/50 p-3">
-            <label htmlFor="profile-email" className="mb-2 block text-xs font-semibold text-muted-foreground">Email account</label>
-            <div className="flex gap-2">
-              <Input id="profile-email" type="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} />
-              <Button size="icon" onClick={() => void saveEmail()} disabled={changingEmail || newEmail.trim() === email} aria-label="Conferma nuova email"><Mail className="h-4 w-4" /></Button>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-border/80 bg-background/50 p-3">
-            <label htmlFor="profile-password" className="mb-2 block text-xs font-semibold text-muted-foreground">Nuova password</label>
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <Input id="profile-password" type={showPassword ? 'text' : 'password'} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={6} className="pr-12" />
-                <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground" aria-label={showPassword ? 'Nascondi nuova password' : 'Mostra nuova password'}>
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              <Button size="icon" onClick={() => void savePassword()} disabled={changingPassword || newPassword.length < 6} aria-label="Cambia password"><KeyRound className="h-4 w-4" /></Button>
-            </div>
-          </div>
+          <button type="button" onClick={() => setPasswordView(true)} className="flex w-full items-center gap-3 rounded-2xl border border-border/80 bg-background/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-surface-raised">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><KeyRound className="h-4 w-4" /></span>
+            <span className="flex-1"><span className="block text-sm font-semibold">Password</span><span className="block text-xs text-muted-foreground">Cambia la password dell’account</span></span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
           <Button variant="outline" className="w-full" onClick={onSignOut}>
             <LogOut className="mr-2 h-4 w-4" /> Esci dall’account
           </Button>
