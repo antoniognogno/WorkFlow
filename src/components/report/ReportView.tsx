@@ -341,6 +341,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                   <Tooltip
                     cursor={{ stroke: 'var(--primary)', strokeOpacity: 0.35 }}
                     contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    labelStyle={{ color: 'var(--foreground)' }}
+                    itemStyle={{ color: 'var(--foreground)' }}
                     formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
                   />
                   <Area type="monotone" dataKey="earnings" stroke="#79b8ad" strokeWidth={3} fill="url(#earningsGradient)" activeDot={{ r: 5, strokeWidth: 2, fill: '#79b8ad' }} />
@@ -365,6 +367,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                   <Tooltip
                     cursor={{ fill: 'var(--primary)', fillOpacity: 0.06 }}
                     contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    labelStyle={{ color: 'var(--foreground)' }}
+                    itemStyle={{ color: 'var(--foreground)' }}
                     formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
                   />
                   <Bar dataKey="value" radius={[0, 8, 8, 0]}>
@@ -389,6 +393,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                 <PieChart>
                   <Tooltip
                     contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
+                    labelStyle={{ color: 'var(--foreground)' }}
+                    itemStyle={{ color: 'var(--foreground)' }}
                     formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
                   />
                   <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} labelLine={false}>

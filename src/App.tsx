@@ -778,7 +778,7 @@ export default function App() {
               <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-primary" />
             </div>
           </div>
-        ) : <>
+        ) : <div key={currentTab} className="tab-enter">
           {currentTab === 'reg' && <RegisterView jobs={jobs} entries={entries} trashEntries={trashEntries} onAddEntry={addEntry} onUpdateEntry={updateEntry} onDeleteEntry={deleteEntry} onRestoreEntry={restoreEntry} onPermanentlyDeleteEntry={permanentlyDeleteEntry} onCreateJob={createJob} />}
           {currentTab === 'rep' && (
             <Suspense fallback={
@@ -797,7 +797,7 @@ export default function App() {
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
           {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} />}
-        </>}
+        </div>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />
     </div>

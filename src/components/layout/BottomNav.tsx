@@ -25,11 +25,12 @@ export function BottomNav({ currentTab, onTabChange }: BottomNavProps) {
             key={id}
             type="button"
             onClick={() => onTabChange(id)}
-            className={`flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1 text-[11px] transition-all duration-200 ${
-              currentTab === id ? 'bg-primary/10 font-semibold text-primary shadow-sm' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+            className={`relative flex min-w-16 flex-col items-center gap-1 rounded-xl px-2 py-1 text-[11px] transition-all duration-200 ${
+              currentTab === id ? 'bg-primary/10 font-semibold text-primary shadow-sm' : 'text-muted-foreground hover:bg-surface-raised hover:text-foreground'
             }`}
           >
-            <Icon className="h-5 w-5" />
+            {currentTab === id && <span className="absolute -top-1 h-0.5 w-5 rounded-full bg-primary motion-safe:animate-[nav-indicator_220ms_ease-out]" />}
+            <Icon className={`h-5 w-5 transition-transform duration-200 ${currentTab === id ? 'scale-105' : 'scale-100'}`} />
             {label}
           </button>
         ))}
