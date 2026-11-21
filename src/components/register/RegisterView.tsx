@@ -13,7 +13,6 @@ interface Job {
   rate: number
   overtimeEnabled: boolean
   overtimeMultiplier: number
-  color?: string
   presets: Array<{ id: string; start: string; end: string }>
 }
 
@@ -158,27 +157,16 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     <div className="space-y-4 pb-24">
       <div><p className="text-sm text-muted-foreground">Panoramica</p><h2 className="text-2xl font-black">Le tue ore</h2></div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Card className="overflow-hidden">
-          <CardContent className="relative p-4">
-            <div className="absolute inset-y-0 left-0 w-1 bg-primary" />
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-semibold text-muted-foreground">Questo mese</p>
-                <p className="mt-2 text-3xl font-black">{formatDuration(totalMinutes(monthEntries))}</p>
-              </div>
-              <Clock3 className="h-5 w-5 text-primary" />
-            </div>
-            <p className="mt-2 text-sm font-bold text-success">{formatCurrency(totalPay(monthEntries))}</p>
-          </CardContent>
-        </Card>
-        <Card className="overflow-hidden">
-          <CardContent className="relative p-4">
-            <div className="absolute inset-y-0 left-0 w-1 bg-success" />
-            <p className="text-xs font-semibold text-muted-foreground">Attività recenti</p>
-            <p className="mt-2 text-3xl font-black">{entries.length}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{trashEntries.length} nel cestino · {monthEntries.length} questo mese</p>
-          </CardContent>
-        </Card>
+        <Card className="border-[#29445a] bg-[#12283a]"><CardContent className="p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#9bb6c8]">Questo mese</p>
+          <p className="mt-2 text-3xl font-black text-[#edf6fb]">{formatDuration(totalMinutes(monthEntries))}</p>
+          <p className="mt-1 text-lg font-bold text-[#9fd0bd]">{formatCurrency(totalPay(monthEntries))}</p>
+        </CardContent></Card>
+        <Card className="border-[#51405b] bg-[#2a2432]"><CardContent className="p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#c2aecb]">Attività recenti</p>
+          <p className="mt-2 text-3xl font-black text-[#f5eff7]">{formatCurrency(totalPay(monthEntries))}</p>
+          <p className="mt-1 text-xs text-[#c2aecb]">{entries.length} registrazioni · {trashEntries.length} nel cestino</p>
+        </CardContent></Card>
       </div>
 
       <Card><CardContent className="p-4">
@@ -233,46 +221,11 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
       </CardContent></Card>
 
       <Card><CardContent className="p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-muted-foreground">Attività</p>
-            <p className="text-sm font-bold">Registrazioni recenti</p>
-          </div>
-          <Archive className="h-5 w-5 text-primary" />
-        </div>
-        <div className="space-y-2">
-          {visibleEntries.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border px-4 py-8 text-center">
-              <Clock3 className="mx-auto h-6 w-6 text-muted-foreground" />
-              <p className="mt-2 text-sm text-muted-foreground">Nessuna attività registrata</p>
-            </div>
-          ) : visibleEntries.map((entry) => {
-            const job = jobs.find((item) => item.id === entry.jobId)
-            const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
-            return (
-              <div key={entry.id} className="group flex items-center gap-3 rounded-2xl border border-border/80 bg-background/40 p-3 transition-[border-color,background-color,transform] duration-200 active:scale-[0.995]">
-                <div className="h-12 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: job?.color || '#7aa6bd' }} />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold">{job?.name ?? 'Lavoro'}{job?.client ? ` · ${job.client}` : ''}</p>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">{formatDateItalian(entry.date)} · {entry.start}–{entry.end}</p>
-                    </div>
-                    <p className="shrink-0 text-sm font-black text-success">{formatCurrency(amount)}</p>
-                  </div>
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    {formatDuration(entry.minutes)} lavorate{entry.overtimeMinutes ? ` · ${formatDuration(entry.overtimeMinutes)} extra` : ''}{entry.breakMinutes ? ` · pausa ${formatDuration(entry.breakMinutes)}` : ''}
-                  </p>
-                  {entry.note && <p className="mt-1 line-clamp-2 rounded-lg bg-muted/40 px-2 py-1 text-[11px] italic text-muted-foreground">{entry.note}</p>}
-                </div>
-                <div className="flex shrink-0 flex-col gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Modifica entrata" onClick={() => startEdit(entry)}><Pencil className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sposta nel cestino" onClick={() => void onDeleteEntry(entry.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
-                </div>
-              </div>
-            )
-          })}
-        </div>
+        <div className="mb-2 flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attività</p><p className="text-sm text-muted-foreground">Le ultime registrazioni, senza filtri</p></div><Archive className="h-5 w-5 text-primary" /></div>
+        <div className="divide-y divide-border">{visibleEntries.length === 0 ? <p className="py-4 text-center text-sm text-muted-foreground">Nessuna attività registrata</p> : visibleEntries.map((entry) => {
+          const job = jobs.find((item) => item.id === entry.jobId)
+          return <div key={entry.id} className="flex items-center justify-between gap-2 py-3"><div className="min-w-0"><p className="truncate text-sm font-semibold">{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</p><p className="text-xs text-muted-foreground">{entry.start}–{entry.end} · lavorate {formatDuration(entry.minutes)}{entry.overtimeMinutes ? ` + ${formatDuration(entry.overtimeMinutes)} extra` : ''}</p><p className="text-xs text-muted-foreground">{entry.breakMinutes ? `Pausa: ${formatDuration(entry.breakMinutes)}` : 'Pausa: nessuna'} · Minuti lavorati: {entry.minutes + entry.overtimeMinutes}</p>{entry.note && <p className="mt-1 line-clamp-2 text-xs italic text-muted-foreground">{entry.note}</p>}</div><div className="flex shrink-0 gap-1"><Button variant="ghost" size="icon" aria-label="Modifica entrata" onClick={() => startEdit(entry)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" aria-label="Sposta nel cestino" onClick={() => void onDeleteEntry(entry.id)}><Trash2 className="h-4 w-4 text-rose-300" /></Button></div></div>
+        })}</div>
         {sortedEntries.length > 5 && <button type="button" className="mt-3 w-full text-xs font-semibold text-primary" onClick={() => setShowAll((value) => !value)}>{showAll ? 'Mostra meno' : `Vedi tutte (${sortedEntries.length})`}</button>}
       </CardContent></Card>
 
