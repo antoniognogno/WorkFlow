@@ -410,7 +410,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                   const offset = (year - now.getFullYear()) * 12 + (month - 1 - now.getMonth())
                   setDashboardMonthOffset(offset)
                 }}
-                className="mt-2 h-9 rounded-xl border border-border bg-card px-2.5 text-xs font-semibold text-foreground outline-none"
+                className="dashboard-month-picker mt-2 h-10 w-full max-w-44 rounded-xl border border-border/90 bg-card px-3 text-xs font-bold text-foreground shadow-sm outline-none transition-colors"
               />
             </div>
             <div className="flex items-center gap-1">
@@ -491,7 +491,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
             return (
               <Card>
                 <CardContent className="p-4">
-                  <div className="mb-3 flex items-center justify-between">
+                  <div className="mb-4 flex items-center justify-between">
                     <div>
                       <p className="text-sm font-bold">Calendario mensile</p>
                       <p className="text-[11px] text-muted-foreground capitalize">
@@ -500,7 +500,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                     </div>
                     <CalendarCheck className="h-5 w-5 text-primary" />
                   </div>
-                  <div className="grid grid-cols-7 gap-1 text-center">
+                  <div className="dashboard-calendar-grid grid grid-cols-7 gap-1.5 text-center">
                     {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((day, index) => (
                       <span key={`${day}-${index}`} className="pb-1 text-[10px] font-bold text-muted-foreground">{day}</span>
                     ))}
@@ -518,24 +518,26 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                           key={date}
                           type="button"
                           onClick={() => setSelectedCalendarDate(date)}
-                          className={`relative flex aspect-square min-h-9 flex-col items-center justify-center rounded-xl text-xs font-semibold transition-all ${
+                          className={`relative flex aspect-square min-h-10 flex-col items-center justify-center rounded-[10px] text-xs font-semibold transition-[background-color,border-color,color,transform,box-shadow] duration-180 active:scale-95 ${
                             active
-                              ? 'bg-primary text-primary-foreground shadow-md'
+                              ? 'bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(122,166,189,0.24)]'
                               : isToday
-                                ? 'border border-primary bg-primary/10 text-primary ring-1 ring-primary/20'
+                                ? 'border border-primary/70 bg-primary/10 text-primary'
                                 : dayEntries.length
-                                  ? 'bg-primary/10 text-foreground'
+                                  ? 'border border-primary/15 bg-primary/8 text-foreground'
                                   : 'text-muted-foreground hover:bg-surface-raised'
                           }`}
                           aria-label={`${day}, ${dayEntries.length} registrazioni`}
                         >
                           <span>{day}</span>
-                          {dayMinutes > 0 && <span className={`mt-0.5 h-1 w-1 rounded-full ${active ? 'bg-primary-foreground' : 'bg-primary'}`} />}
+                          {dayMinutes > 0 && (
+                            <span className={`absolute bottom-1 h-1 w-1 rounded-full ${active ? 'bg-primary-foreground' : 'bg-primary'}`} />
+                          )}
                         </button>
                       )
                     })}
                   </div>
-                  <div className="mt-3 flex items-center justify-between rounded-xl border border-border bg-background/50 px-3 py-2.5">
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-border/80 bg-background/60 px-3.5 py-3">
                     <div>
                       <p className="text-xs font-semibold">{selected.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">{selectedEntries.length} registrazioni · {formatDuration(selectedMinutes)}</p>
