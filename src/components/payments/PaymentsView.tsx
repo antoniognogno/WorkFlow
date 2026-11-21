@@ -94,6 +94,32 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
     return paymentDate >= statementStart && paymentDate <= statementEnd
   })
   const statementTotal = statementEntries.reduce((sum, entry) => sum + amountFor(entry), 0)
+  const statementDayCount = Math.max(
+    1,
+    Math.round((new Date(`${statementEnd}T12:00:00`).getTime() - new Date(`${statementStart}T12:00:00`).getTime()) / 86400000) + 1,
+  )
+  const statementPreviousEnd = new Date(`${statementStart}T12:00:00`)
+  statementPreviousEnd.setDate(statementPreviousEnd.getDate() - 1)
+  const statementPreviousStart = new Date(statementPreviousEnd)
+  statementPreviousStart.setDate(statementPreviousStart.getDate() - statementDayCount + 1)
+  const statementPreviousEntries = allPaidEntries.filter((entry) => {
+    const paymentDate = entry.paidAt?.slice(0, 10) ?? entry.date
+    return paymentDate >= statementPreviousStart.toISOString().slice(0, 10)
+      && paymentDate <= statementPreviousEnd.toISOString().slice(0, 10)
+  })
+  const statementPreviousTotal = statementPreviousEntries.reduce((sum, entry) => sum + amountFor(entry), 0)
+  const statementVariation = statementPreviousTotal > 0
+    ? ((statementTotal - statementPreviousTotal) / statementPreviousTotal) * 100
+    : statementTotal > 0 ? 100 : 0
+  const statementAverage = statementEntries.length > 0 ? statementTotal / statementEntries.length : 0
+  const statementByJob = [...statementEntries].reduce((groups, entry) => {
+    const jobName = getJob(entry.jobId)?.name ?? 'Lavoro'
+    const current = groups.get(jobName) ?? { entries: 0, total: 0 }
+    current.entries += 1
+    current.total += amountFor(entry)
+    groups.set(jobName, current)
+    return groups
+  }, new Map<string, { entries: number; total: number }>())
 
   const beginPaymentEdit = (entry: Entry) => {
     setEditingPaymentId(entry.id)
@@ -119,19 +145,57 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
   const renderPaidEntry = (entry: Entry) => {
     const isEditing = editingPaymentId === entry.id
     const isCancelling = cancelPaymentId === entry.id
+    const job = getJob(entry.jobId)
     return (
-      <div key={entry.id} className="flex flex-wrap items-center gap-3 py-3">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-success/30 bg-card text-success"><CheckCircle2 className="h-4 w-4" /></div>
-        {isEditing ? <div className="min-w-0 flex-1 space-y-2">
-          <p className="text-xs font-semibold">Modifica dettagli pagamento</p>
-          <input type="date" value={editPaymentDate} onChange={(event) => setEditPaymentDate(event.target.value)} className="select-modern" aria-label="Data pagamento modificata" />
-          <Select value={editPaymentMethod} onChange={setEditPaymentMethod} options={[{ value: '', label: 'Non specificato' }, { value: 'bonifico', label: 'Bonifico bancario' }, { value: 'contanti', label: 'Contanti' }, { value: 'carta', label: 'Carta' }, { value: 'paypal', label: 'PayPal' }, { value: 'altro', label: 'Altro' }]} />
-          <input type="text" value={editPaymentNote} onChange={(event) => setEditPaymentNote(event.target.value)} placeholder="Nota o riferimento" className="select-modern" maxLength={120} aria-label="Nota pagamento modificata" />
-          <div className="flex gap-2"><Button size="sm" onClick={() => void savePaymentEdit()}>Salva</Button><Button size="sm" variant="outline" onClick={() => setEditingPaymentId(null)}>Annulla</Button></div>
-        </div> : <div className="min-w-0 flex-1"><p className="truncate text-xs font-semibold">{getJob(entry.jobId)?.name ?? 'Lavoro'}{getJob(entry.jobId)?.client ? ` · ${getJob(entry.jobId)?.client}` : ''}</p><p className="text-[11px] text-muted-foreground">{entry.paidAt ? `Ricevuto il ${formatDateLongItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateLongItalian(entry.date)}`}{entry.paymentMethod ? ` · ${entry.paymentMethod}` : ''}{entry.paymentNote ? ` · ${entry.paymentNote}` : ''}</p></div>}
-        {!isEditing && <div className="flex items-center gap-1"><Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => beginPaymentEdit(entry)} aria-label="Modifica dettagli pagamento"><Pencil className="h-3.5 w-3.5" /></Button><Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={() => { setCancelPaymentId(entry.id); setCancelConfirmation('') }}>Annulla pagamento</Button></div>}
-        <span className="text-sm font-bold text-success">{formatCurrency(amountFor(entry))}</span>
-        {isCancelling && <div className="w-full rounded-lg border border-destructive/60 bg-destructive/10 p-3 text-xs"><p className="font-semibold text-destructive">Le ore resteranno, ma questo importo tornerà tra quelli da ricevere.</p><p className="mt-1 text-muted-foreground">Scrivi esattamente <strong>Annulla</strong> per confermare.</p><input value={cancelConfirmation} onChange={(event) => setCancelConfirmation(event.target.value)} placeholder="Scrivi Annulla" className="select-modern mt-2" aria-label="Conferma annullamento pagamento" /><div className="mt-2 flex gap-2"><Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={cancelConfirmation !== 'Annulla'} onClick={() => void confirmPaymentCancellation()}>Conferma annullamento</Button><Button size="sm" variant="outline" onClick={() => setCancelPaymentId(null)}>Indietro</Button></div></div>}
+      <div key={entry.id} className="rounded-2xl border border-border/80 bg-background/40 p-3">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-success/30 bg-success/10 text-success">
+            <CheckCircle2 className="h-4 w-4" />
+          </div>
+          {isEditing ? (
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-xs font-bold">Modifica dettagli pagamento</p>
+              <input type="date" value={editPaymentDate} onChange={(event) => setEditPaymentDate(event.target.value)} className="select-modern" aria-label="Data pagamento modificata" />
+              <Select value={editPaymentMethod} onChange={setEditPaymentMethod} options={[{ value: '', label: 'Non specificato' }, { value: 'bonifico', label: 'Bonifico bancario' }, { value: 'contanti', label: 'Contanti' }, { value: 'carta', label: 'Carta' }, { value: 'paypal', label: 'PayPal' }, { value: 'altro', label: 'Altro' }]} />
+              <input type="text" value={editPaymentNote} onChange={(event) => setEditPaymentNote(event.target.value)} placeholder="Nota o riferimento" className="select-modern" maxLength={120} aria-label="Nota pagamento modificata" />
+              <div className="flex gap-2"><Button size="sm" onClick={() => void savePaymentEdit()}>Salva</Button><Button size="sm" variant="outline" onClick={() => setEditingPaymentId(null)}>Annulla</Button></div>
+            </div>
+          ) : (
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold">{job?.name ?? 'Lavoro'}{job?.client ? ` · ${job.client}` : ''}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {entry.paidAt ? `Ricevuto il ${formatDateLongItalian(entry.paidAt.slice(0, 10))}` : `Registrato il ${formatDateLongItalian(entry.date)}`}
+                  </p>
+                </div>
+                <p className="shrink-0 text-sm font-black text-success">{formatCurrency(amountFor(entry))}</p>
+              </div>
+              {(entry.paymentMethod || entry.paymentNote) && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {[entry.paymentMethod, entry.paymentNote].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+          )}
+          {!isEditing && (
+            <div className="flex shrink-0 flex-col gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => beginPaymentEdit(entry)} aria-label="Modifica dettagli pagamento"><Pencil className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => { setCancelPaymentId(entry.id); setCancelConfirmation('') }} aria-label="Annulla pagamento"><WalletCards className="h-3.5 w-3.5" /></Button>
+            </div>
+          )}
+        </div>
+        {isCancelling && (
+          <div className="mt-3 rounded-xl border border-destructive/60 bg-destructive/10 p-3 text-xs">
+            <p className="font-semibold text-destructive">Le ore resteranno, ma questo importo tornerà tra quelli da ricevere.</p>
+            <p className="mt-1 text-muted-foreground">Scrivi esattamente <strong>Annulla</strong> per confermare.</p>
+            <input value={cancelConfirmation} onChange={(event) => setCancelConfirmation(event.target.value)} placeholder="Scrivi Annulla" className="select-modern mt-2" aria-label="Conferma annullamento pagamento" />
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <Button size="sm" className="bg-destructive text-destructive-foreground hover:bg-destructive/90" disabled={cancelConfirmation !== 'Annulla'} onClick={() => void confirmPaymentCancellation()}>Conferma annullamento</Button>
+              <Button size="sm" variant="outline" onClick={() => setCancelPaymentId(null)}>Indietro</Button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -139,7 +203,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
   if (showStatement) {
     return (
       <div className="space-y-4 pb-24">
-        <button type="button" onClick={() => setShowStatement(false)} className="flex items-center gap-2 text-sm font-semibold text-primary">
+        <button type="button" onClick={() => setShowStatement(false)} className="flex min-h-10 items-center gap-2 rounded-xl text-sm font-semibold text-muted-foreground transition-colors hover:text-primary">
           <ArrowLeft className="h-4 w-4" /> Torna ai pagamenti
         </button>
         <div>
@@ -148,17 +212,64 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
           <p className="mt-1 text-xs text-muted-foreground">Storico degli importi ricevuti nel periodo selezionato.</p>
         </div>
 
-        <Card className="border-primary/40">
-          <CardContent className="p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <div className="rounded-xl border border-primary/30 bg-card p-2 text-primary"><ReceiptText className="h-5 w-5" /></div>
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Totale ricevuto</p><p className="mt-1 text-3xl font-black text-success">{formatCurrency(statementTotal)}</p></div>
+        <Card className="overflow-hidden">
+          <CardContent className="relative p-4">
+            <div className="absolute inset-y-0 left-0 w-1 bg-success" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-success/10 text-success"><ReceiptText className="h-5 w-5" /></div>
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Totale ricevuto</p>
+                  <p className="mt-1 text-3xl font-black text-success">{formatCurrency(statementTotal)}</p>
+                </div>
               </div>
-              <p className="text-right text-xs text-muted-foreground">{statementEntries.length} {statementEntries.length === 1 ? 'operazione' : 'operazioni'}</p>
+              <p className="rounded-full bg-surface-raised px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                {statementEntries.length} {statementEntries.length === 1 ? 'operazione' : 'operazioni'}
+              </p>
             </div>
           </CardContent>
         </Card>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Media per operazione</p>
+              <p className="mt-2 text-xl font-black">{formatCurrency(statementAverage)}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{statementEntries.length} pagamenti ricevuti</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Rispetto periodo precedente</p>
+              <p className={`mt-2 text-xl font-black ${statementVariation >= 0 ? 'text-success' : 'text-destructive'}`}>
+                {statementVariation >= 0 ? '+' : ''}{statementVariation.toFixed(1)}%
+              </p>
+              <p className="mt-1 text-[11px] text-muted-foreground">Prima: {formatCurrency(statementPreviousTotal)}</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {statementByJob.size > 0 && (
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-bold">Ripartizione incassi</p>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Totale ricevuto per lavoro nel periodo</p>
+              <div className="mt-3 space-y-2">
+                {[...statementByJob.entries()]
+                  .sort(([, first], [, second]) => second.total - first.total)
+                  .map(([name, summary]) => (
+                    <div key={name} className="flex items-center justify-between rounded-xl border border-border/70 bg-background/40 px-3 py-2.5">
+                      <div className="min-w-0 pr-2">
+                        <p className="truncate text-xs font-bold">{name}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{summary.entries} {summary.entries === 1 ? 'operazione' : 'operazioni'}</p>
+                      </div>
+                      <p className="shrink-0 text-sm font-black text-success">{formatCurrency(summary.total)}</p>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="space-y-3 p-4">
@@ -188,7 +299,7 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
         <Card>
           <CardContent className="p-4">
             {statementEntries.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">Nessun incasso nel periodo selezionato.</p> : (
-              <div className="divide-y divide-border">
+              <div className="space-y-2">
                 {statementEntries.map(renderPaidEntry)}
               </div>
             )}
@@ -383,9 +494,10 @@ export const PaymentsView: React.FC<PaymentsViewProps> = ({ jobs, entries, onMar
       {paidEntries.length > 0 && <Card>
         <CardContent className="p-4">
           <button type="button" onClick={() => setShowPaid((value) => !value)} className="flex w-full items-center justify-between text-sm font-bold">
-            <span>Già pagati ({paidEntries.length})</span><ChevronDown className={`h-4 w-4 transition-transform ${showPaid ? 'rotate-180' : ''}`} />
+            <span className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> Già pagati ({paidEntries.length})</span>
+            <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showPaid ? 'rotate-180' : ''}`} />
           </button>
-          {showPaid && <div className="mt-3 divide-y divide-border border-t border-border pt-3">{paidEntries.map(renderPaidEntry)}</div>}
+          {showPaid && <div className="mt-3 space-y-2 border-t border-border pt-3">{paidEntries.map(renderPaidEntry)}</div>}
         </CardContent>
       </Card>}
 

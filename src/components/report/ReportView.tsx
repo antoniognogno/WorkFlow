@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_NAMES } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, CalendarCheck, Clock3, WalletCards, Award } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown, CalendarCheck, Clock3, WalletCards, Award, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/select'
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
@@ -37,6 +37,7 @@ interface Entry {
 interface ReportViewProps {
   jobs: Job[]
   entries: Entry[]
+  onAddForDate?: (date: string) => void
 }
 
 type Period = 'last7' | 'last30' | 'week' | 'month' | 'quarter' | 'semester' | 'year' | 'custom'
@@ -69,7 +70,7 @@ const JobChartTooltip = ({ active, payload }: JobChartTooltipProps) => {
   )
 }
 
-export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
+export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries, onAddForDate }) => {
   const [reportView, setReportView] = useState<'dashboard' | 'detail'>(() =>
     localStorage.getItem('workflow-report-view') === 'detail' ? 'detail' : 'dashboard',
   )
@@ -204,7 +205,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
     const previousPay = previousEntries.reduce((sum, entry) =>
       sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate),
     0)
+    const previousMinutes = previousEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
     const earningsVariation = previousPay > 0 ? ((monthPay - previousPay) / previousPay) * 100 : monthPay > 0 ? 100 : 0
+    const hoursVariation = previousMinutes > 0
+      ? ((monthMinutes - previousMinutes) / previousMinutes) * 100
+      : monthMinutes > 0 ? 100 : 0
 
     const weekly = new Map<number, { hours: number; earnings: number }>()
     monthEntries.forEach((entry) => {
@@ -235,6 +240,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       return { id: job.id, name: job.name, client: job.client, color: job.color, target, pay }
     }).filter((item) => item.target > 0)
 
+    const jobBreakdown = jobs.map((job) => {
+      const value = monthEntries
+        .filter((entry) => entry.jobId === job.id)
+        .reduce((sum, entry) => sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate), 0)
+      return {
+        name: job.client ? `${job.name} · ${job.client}` : job.name,
+        value: Number(value.toFixed(2)),
+        color: job.color || getDefaultJobColor(jobs.indexOf(job)),
+      }
+    }).filter((item) => item.value > 0).sort((first, second) => second.value - first.value)
+
     return {
       monthEntries,
       monthMinutes,
@@ -262,11 +278,14 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       outstandingPay: Math.max(0, monthPay - paidPay),
       workdays,
       earningsVariation,
+      hoursVariation,
+      previousMinutes,
       weeklyData,
       remainingDays,
       remainingHours,
       remainingEarnings,
       jobProgress,
+      jobBreakdown,
       monthLabel: now.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' }),
       weekRemainingHours: (() => {
         const monday = new Date(now)
@@ -294,6 +313,17 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
           totals.set(client, (totals.get(client) ?? 0) + amount)
         })
         return Array.from(totals.entries()).sort(([, first], [, second]) => second - first)[0] ?? null
+      })(),
+      topJob: (() => {
+        const totals = new Map<string, { name: string; amount: number }>()
+        monthEntries.forEach((entry) => {
+          const job = getJob(entry.jobId)
+          const amount = (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate)
+          const current = totals.get(entry.jobId) ?? { name: job.client ? `${job.name} · ${job.client}` : job.name, amount: 0 }
+          current.amount += amount
+          totals.set(entry.jobId, current)
+        })
+        return Array.from(totals.values()).sort((first, second) => second.amount - first.amount)[0] ?? null
       })(),
       bestMonth: (() => {
         const totals = new Map<string, number>()
@@ -395,6 +425,205 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
 
       {reportView === 'dashboard' ? (
         <div className="view-enter space-y-4">
+          <div className="dashboard-compact space-y-3">
+            <div className="flex items-end justify-between">
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground">Riepilogo</p>
+                <h2 className="text-2xl font-black capitalize">{dashboard.monthLabel}</h2>
+                <input
+                  type="month"
+                  aria-label="Seleziona mese dashboard"
+                  value={`${new Date(new Date().setMonth(new Date().getMonth() + dashboardMonthOffset)).getFullYear()}-${String(new Date(new Date().setMonth(new Date().getMonth() + dashboardMonthOffset)).getMonth() + 1).padStart(2, '0')}`}
+                  onChange={(event) => {
+                    const [year, month] = event.target.value.split('-').map(Number)
+                    if (!year || !month) return
+                    const now = new Date()
+                    setDashboardMonthOffset((year - now.getFullYear()) * 12 + (month - 1 - now.getMonth()))
+                  }}
+                  className="dashboard-month-picker mt-2 h-9 rounded-xl border border-border/90 bg-card px-2.5 text-xs font-bold text-foreground shadow-sm outline-none"
+                />
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setDashboardMonthOffset((offset) => offset - 1)} aria-label="Mese precedente">
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => setDashboardMonthOffset((offset) => offset + 1)} disabled={dashboardMonthOffset >= 0} aria-label="Mese successivo">
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden">
+              <CardContent className="p-4">
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground">Guadagno</p>
+                    <p className="mt-1 text-3xl font-black text-success">{formatCurrency(dashboard.monthPay)}</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-black ${dashboard.earningsVariation >= 0 ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
+                    {dashboard.earningsVariation >= 0 ? '+' : ''}{dashboard.earningsVariation.toFixed(0)}%
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-xl bg-success/10 px-3 py-2">
+                    <p className="text-muted-foreground">Pagato</p>
+                    <p className="mt-1 font-black text-success">{formatCurrency(dashboard.paidPay)}</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-500/10 px-3 py-2">
+                    <p className="text-muted-foreground">Da ricevere</p>
+                    <p className="mt-1 font-black text-amber-500">{formatCurrency(dashboard.outstandingPay)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {dashboard.jobBreakdown.length > 0 && (
+              <Card className="overflow-hidden">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-bold">Ripartizione</p>
+                      <p className="text-[10px] text-muted-foreground">Guadagno per lavoro</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 h-40">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Tooltip content={<JobChartTooltip />} isAnimationActive={false} />
+                        <Pie data={dashboard.jobBreakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={34} outerRadius={58} paddingAngle={3} isAnimationActive>
+                          {dashboard.jobBreakdown.map((item) => <Cell key={item.name} fill={item.color} />)}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            <div className="grid grid-cols-3 gap-2">
+              <Card><CardContent className="p-3"><Clock3 className="h-4 w-4 text-primary" /><p className="mt-2 text-lg font-black">{formatDuration(dashboard.monthMinutes)}</p><p className="text-[10px] text-muted-foreground">Ore</p></CardContent></Card>
+              <Card><CardContent className="p-3"><CalendarCheck className="h-4 w-4 text-primary" /><p className="mt-2 text-lg font-black">{dashboard.workdays}</p><p className="text-[10px] text-muted-foreground">Giorni</p></CardContent></Card>
+              <Card><CardContent className="p-3"><Clock3 className="h-4 w-4 text-success" /><p className="mt-2 text-lg font-black">{dashboard.averageHoursPerDay.toFixed(1)} h</p><p className="text-[10px] text-muted-foreground">Media/giorno</p></CardContent></Card>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {dashboard.topClient && (
+                <Card><CardContent className="p-3"><p className="text-[10px] text-muted-foreground">Cliente top</p><p className="mt-1 truncate text-sm font-black">{dashboard.topClient[0]}</p><p className="mt-1 text-xs font-bold text-success">{formatCurrency(dashboard.topClient[1])}</p></CardContent></Card>
+              )}
+              {dashboard.bestMonth && (
+                <Card><CardContent className="p-3"><Award className="h-3.5 w-3.5 text-amber-500" /><p className="mt-1 text-[10px] text-muted-foreground">Mese migliore</p><p className="mt-1 truncate text-xs font-black capitalize">{dashboard.bestMonth.label}</p><p className="mt-1 text-xs font-bold text-success">{formatCurrency(dashboard.bestMonth.amount)}</p></CardContent></Card>
+              )}
+            </div>
+
+            {(() => {
+              const selected = new Date(`${selectedCalendarDate}T12:00:00`)
+              const year = selected.getFullYear()
+              const month = selected.getMonth()
+              const firstDay = new Date(year, month, 1)
+              const startOffset = (firstDay.getDay() + 6) % 7
+              const daysInMonth = new Date(year, month + 1, 0).getDate()
+              const entriesByDate = new Map<string, typeof dashboard.monthEntries>()
+              dashboard.monthEntries.forEach((entry) => {
+                const dayEntries = entriesByDate.get(entry.date) ?? []
+                dayEntries.push(entry)
+                entriesByDate.set(entry.date, dayEntries)
+              })
+              const selectedEntries = entriesByDate.get(selectedCalendarDate) ?? []
+              const selectedMinutes = selectedEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+              const selectedPay = selectedEntries.reduce((sum, entry) =>
+                sum + (entry.minutes / 60) * entry.rate + (entry.overtimeMinutes / 60) * (entry.overtimeRate || entry.rate),
+              0)
+              return (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-bold">Calendario</p>
+                        <p className="text-[10px] text-muted-foreground capitalize">{selected.toLocaleDateString('it-IT', { month: 'long', year: 'numeric' })}</p>
+                      </div>
+                      <CalendarCheck className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="dashboard-calendar-grid grid grid-cols-7 gap-1.5 text-center">
+                      {['L', 'M', 'M', 'G', 'V', 'S', 'D'].map((day, index) => (
+                        <span key={`${day}-${index}`} className="pb-1 text-[10px] font-bold text-muted-foreground">{day}</span>
+                      ))}
+                      {Array.from({ length: startOffset }, (_, index) => <span key={`empty-${index}`} />)}
+                      {Array.from({ length: daysInMonth }, (_, index) => {
+                        const day = index + 1
+                        const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                        const dayEntries = entriesByDate.get(date) ?? []
+                        const active = selectedCalendarDate === date
+                        const dayMinutes = dayEntries.reduce((sum, entry) => sum + entry.minutes + entry.overtimeMinutes, 0)
+                        const today = new Date()
+                        const isToday = date === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+                        return (
+                          <button
+                            key={date}
+                            type="button"
+                            onClick={() => setSelectedCalendarDate(date)}
+                            className={`relative flex aspect-square min-h-10 flex-col items-center justify-center rounded-[10px] text-xs font-semibold transition-[background-color,border-color,color,transform,box-shadow] duration-180 active:scale-95 ${
+                              active
+                                ? 'bg-primary text-primary-foreground shadow-[0_6px_16px_rgba(122,166,189,0.24)]'
+                                : isToday
+                                  ? 'border border-primary/70 bg-primary/10 text-primary'
+                                  : dayEntries.length
+                                    ? 'border border-primary/15 bg-primary/8 text-foreground'
+                                    : 'text-muted-foreground hover:bg-surface-raised'
+                            }`}
+                            aria-label={`${day}, ${dayEntries.length} registrazioni`}
+                          >
+                            <span>{day}</span>
+                            {dayMinutes > 0 && <span className={`absolute bottom-1 h-1 w-1 rounded-full ${active ? 'bg-primary-foreground' : 'bg-primary'}`} />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div className="mt-4 flex items-center justify-between rounded-2xl border border-border/80 bg-background/60 px-3.5 py-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold">{selected.toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">{selectedEntries.length} registrazioni · {formatDuration(selectedMinutes)}</p>
+                      </div>
+                      <div className="ml-3 flex shrink-0 items-center gap-2">
+                        <p className="text-sm font-black text-success">{formatCurrency(selectedPay)}</p>
+                        <button type="button" onClick={() => onAddForDate?.(selectedCalendarDate)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95" aria-label={`Aggiungi attività il ${selected.toLocaleDateString('it-IT')}`}>
+                          <Plus className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })()}
+
+            {dashboard.weeklyData.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm font-bold">Settimane</p>
+                    <p className="text-[10px] text-muted-foreground">Ore · Guadagno</p>
+                  </div>
+                  <div className="space-y-2.5">
+                    {dashboard.weeklyData.map((week) => {
+                      const maxHours = Math.max(...dashboard.weeklyData.map((item) => item.hours), 1)
+                      const maxEarnings = Math.max(...dashboard.weeklyData.map((item) => item.earnings), 1)
+                      return (
+                        <div key={week.week} className="grid grid-cols-[42px_1fr_58px] items-center gap-2">
+                          <p className="text-[10px] font-bold">{week.week.replace('Sett. ', 'S')}</p>
+                          <div className="space-y-1">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted/40"><div className="h-full rounded-full bg-primary" style={{ width: `${(week.hours / maxHours) * 100}%` }} /></div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted/40"><div className="h-full rounded-full bg-success" style={{ width: `${(week.earnings / maxEarnings) * 100}%` }} /></div>
+                          </div>
+                          <p className="text-right text-[10px] font-black text-success">{formatCurrency(week.earnings)}</p>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="dashboard-legacy">
           <div className="flex items-end justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Riepilogo mensile</p>
@@ -435,6 +664,53 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
               </Button>
             </div>
           </div>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold text-muted-foreground">Guadagno del mese</p>
+                  <p className="mt-1 text-3xl font-black text-success">{formatCurrency(dashboard.monthPay)}</p>
+                </div>
+                <WalletCards className="h-7 w-7 text-primary/70" />
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div className="rounded-xl bg-success/10 px-3 py-2">
+                  <p className="text-muted-foreground">Pagato</p>
+                  <p className="mt-1 font-black text-success">{formatCurrency(dashboard.paidPay)}</p>
+                </div>
+                <div className="rounded-xl bg-amber-500/10 px-3 py-2">
+                  <p className="text-muted-foreground">Da ricevere</p>
+                  <p className="mt-1 font-black text-amber-500">{formatCurrency(dashboard.outstandingPay)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-bold">Confronto mese precedente</p>
+                {dashboard.earningsVariation >= 0
+                  ? <TrendingUp className="h-4 w-4 text-success" />
+                  : <TrendingDown className="h-4 w-4 text-destructive" />}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-background/60 px-3 py-2.5">
+                  <p className="text-[10px] text-muted-foreground">Guadagno</p>
+                  <p className={`mt-1 text-lg font-black ${dashboard.earningsVariation >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {dashboard.earningsVariation >= 0 ? '+' : ''}{dashboard.earningsVariation.toFixed(1)}%
+                  </p>
+                </div>
+                <div className="rounded-xl bg-background/60 px-3 py-2.5">
+                  <p className="text-[10px] text-muted-foreground">Ore</p>
+                  <p className={`mt-1 text-lg font-black ${dashboard.hoursVariation >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    {dashboard.hoursVariation >= 0 ? '+' : ''}{dashboard.hoursVariation.toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <div className="grid grid-cols-2 gap-3">
             <Card>
@@ -538,11 +814,21 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                     })}
                   </div>
                   <div className="mt-4 flex items-center justify-between rounded-2xl border border-border/80 bg-background/60 px-3.5 py-3">
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold">{selected.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
                       <p className="mt-0.5 text-[11px] text-muted-foreground">{selectedEntries.length} registrazioni · {formatDuration(selectedMinutes)}</p>
                     </div>
-                    <p className="text-sm font-black text-success">{formatCurrency(selectedPay)}</p>
+                    <div className="ml-3 flex shrink-0 items-center gap-2">
+                      <p className="text-sm font-black text-success">{formatCurrency(selectedPay)}</p>
+                      <button
+                        type="button"
+                        onClick={() => onAddForDate?.(selectedCalendarDate)}
+                        className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm transition-transform active:scale-95"
+                        aria-label={`Aggiungi attività il ${selected.toLocaleDateString('it-IT')}`}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -550,6 +836,15 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
           })()}
 
           <div className="grid grid-cols-2 gap-3">
+            {dashboard.topJob && (
+              <Card>
+                <CardContent className="p-4">
+                  <p className="text-xs text-muted-foreground">Lavoro principale</p>
+                  <p className="mt-2 truncate text-sm font-black">{dashboard.topJob.name}</p>
+                  <p className="mt-1 text-sm font-bold text-success">{formatCurrency(dashboard.topJob.amount)}</p>
+                </CardContent>
+              </Card>
+            )}
             {dashboard.topClient && (
               <Card>
                 <CardContent className="p-4">
@@ -573,47 +868,99 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
 
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${dashboard.earningsVariation >= 0 ? 'bg-success' : 'bg-destructive'}`} />
                 <div>
-                  <p className="text-xs font-semibold text-muted-foreground">Guadagno del mese</p>
-                  <p className="mt-1 text-3xl font-black text-success">{formatCurrency(dashboard.monthPay)}</p>
-                </div>
-                <WalletCards className="h-7 w-7 text-primary/70" />
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl bg-success/10 px-3 py-2">
-                  <p className="text-muted-foreground">Pagato</p>
-                  <p className="mt-1 font-black text-success">{formatCurrency(dashboard.paidPay)}</p>
-                </div>
-                <div className="rounded-xl bg-amber-500/10 px-3 py-2">
-                  <p className="text-muted-foreground">Da ricevere</p>
-                  <p className="mt-1 font-black text-amber-500">{formatCurrency(dashboard.outstandingPay)}</p>
+                  <p className="text-sm font-bold">Andamento del mese</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    {dashboard.earningsVariation === 0
+                      ? 'Il guadagno è stabile rispetto al mese precedente.'
+                      : dashboard.earningsVariation > 0
+                        ? `Il guadagno è aumentato del ${dashboard.earningsVariation.toFixed(1)}% rispetto al mese precedente.`
+                        : `Il guadagno è diminuito del ${Math.abs(dashboard.earningsVariation).toFixed(1)}% rispetto al mese precedente.`}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {dashboard.jobBreakdown.length > 0 && (
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-sm font-bold">Ripartizione per lavoro</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground">Quota sul guadagno del mese</p>
+                <div className="mt-2 h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Tooltip content={<JobChartTooltip />} isAnimationActive={false} />
+                      <Pie
+                        data={dashboard.jobBreakdown}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={36}
+                        outerRadius={60}
+                        paddingAngle={3}
+                        labelLine={false}
+                        activeShape={false}
+                        isAnimationActive
+                      >
+                        {dashboard.jobBreakdown.map((item) => (
+                          <Cell key={item.name} fill={item.color} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {dashboard.weeklyData.length > 0 && (
             <Card>
               <CardContent className="p-4">
                 <p className="text-sm font-bold">Andamento settimanale</p>
                 <p className="mt-0.5 text-[11px] text-muted-foreground">Ore e guadagni mese corrente</p>
-                <div className="mt-3 h-44 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={dashboard.weeklyData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
-                      <CartesianGrid stroke="var(--border)" strokeOpacity={0.55} vertical={false} />
-                      <XAxis dataKey="week" tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
-                      <Tooltip contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12 }} formatter={(value, name) => name === 'earnings' ? [formatCurrency(Number(value)), 'Guadagno'] : [`${Number(value).toFixed(1)} h`, 'Ore']} />
-                      <Bar dataKey="hours" fill="#7aa6bd" radius={[8, 8, 2, 2]} />
-                      <Bar dataKey="earnings" fill="#79b8ad" radius={[8, 8, 2, 2]} />
-                    </BarChart>
-                  </ResponsiveContainer>
+                <div className="mt-4 space-y-3">
+                  {dashboard.weeklyData.map((week) => {
+                    const maxHours = Math.max(...dashboard.weeklyData.map((item) => item.hours), 1)
+                    const maxEarnings = Math.max(...dashboard.weeklyData.map((item) => item.earnings), 1)
+                    return (
+                      <div key={week.week} className="rounded-2xl border border-border/70 bg-background/40 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <p className="text-xs font-bold">{week.week}</p>
+                          <p className="text-xs font-black text-success">{formatCurrency(week.earnings)}</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <div>
+                            <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
+                              <span>Ore</span>
+                              <span className="font-semibold text-foreground">{week.hours.toFixed(1)} h</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-muted/40">
+                              <div className="h-full rounded-full bg-primary transition-[width] duration-700" style={{ width: `${(week.hours / maxHours) * 100}%` }} />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="mb-1 flex justify-between text-[10px] text-muted-foreground">
+                              <span>Guadagno</span>
+                              <span className="font-semibold text-success">{formatCurrency(week.earnings)}</span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-muted/40">
+                              <div className="h-full rounded-full bg-success transition-[width] duration-700" style={{ width: `${(week.earnings / maxEarnings) * 100}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
-            </Card>
-          )}
+          </Card>
+        )}
         </div>
+          </div>
       ) : (
         <>
       {/* Selettore Periodo */}

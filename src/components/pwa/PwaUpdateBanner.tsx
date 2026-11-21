@@ -72,8 +72,13 @@ export function PwaUpdatesView() {
             <p className="text-sm font-bold">Novità recenti</p>
           </div>
           <ul className="space-y-2 text-xs leading-relaxed text-muted-foreground">
-            <li>• Calendario mensile e obiettivi settimanali intelligenti.</li>
-            <li>• Dashboard pagamenti con incassi e cliente più redditizio.</li>
+            <li>• Dashboard nuova e compatta con ripartizione, settimane e numeri principali.</li>
+            <li>• Calendario mensile interattivo con aggiunta rapida dal giorno selezionato.</li>
+            <li>• KPI immediati: ore, giorni lavorati, media giornaliera, cliente e mese migliori.</li>
+            <li>• Attività ed estratto conto con card più moderne e leggibili.</li>
+            <li>• Dashboard mensile con confronto, calendario, trend e ripartizione.</li>
+            <li>• Top lavoro, top cliente, mese migliore e previsioni storiche.</li>
+            <li>• Pagamenti, incassi e importi residui subito visibili.</li>
             <li>• Note attività, colori lavori e grafici più chiari.</li>
             <li>• Migliore utilizzo offline e sincronizzazione delle modifiche.</li>
           </ul>

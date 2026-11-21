@@ -238,6 +238,10 @@ export default function App() {
   const changeTab = (tab: TabType) => {
     setCurrentTab(tab)
     localStorage.setItem('workflow-current-tab', tab)
+    window.scrollTo({
+      top: 0,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    })
   }
 
   useEffect(() => {
@@ -855,7 +859,10 @@ export default function App() {
                 </div>
               </div>
             }>
-              <ReportView jobs={jobs} entries={entries} />
+              <ReportView jobs={jobs} entries={entries} onAddForDate={(date) => {
+                localStorage.setItem('workflow-selected-entry-date', date)
+                changeTab('reg')
+              }} />
             </Suspense>
           )}
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
