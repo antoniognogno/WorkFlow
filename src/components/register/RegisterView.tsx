@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { calculateMinutes, formatCurrency, formatDateItalian, formatDuration } from '@/lib/utils'
-import { Archive, BriefcaseBusiness, Clock3, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
+import { Archive, BriefcaseBusiness, ChevronDown, Clock3, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react'
 import { Select } from '@/components/ui/select'
 
 interface Job {
@@ -87,6 +87,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [newJobMultiplier, setNewJobMultiplier] = useState('1.5')
   const [dateInput, setDateInput] = useState(formatDateInput(today))
   const [trashConfirmation, setTrashConfirmation] = useState<{ type: 'restore' | 'delete'; entry: Entry } | null>(null)
+  const [showNotes, setShowNotes] = useState(false)
   const selectedJob = jobs.find((job) => job.id === form.jobId)
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`)), [entries])
   const visibleEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5)
@@ -108,11 +109,13 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     if (editingId) await onUpdateEntry(editingId, form.jobId, date, start, end, breakMinutes, overtimeMinutes, form.note)
     else await onAddEntry(form.jobId, date, start, end, breakMinutes, overtimeMinutes, form.note)
     setEditingId(null)
+    setShowNotes(false)
     setForm({ ...emptyForm, jobId: form.jobId, date: today })
     setDateInput(formatDateInput(today))
   }
   const startEdit = (entry: Entry) => {
     setEditingId(entry.id)
+    setShowNotes(Boolean(entry.note?.trim()))
     setForm({ jobId: entry.jobId, date: entry.date, start: entry.start, end: entry.end, breakMinutes: String(entry.breakMinutes), overtimeMinutes: String(entry.overtimeMinutes), note: entry.note ?? '' })
     setDateInput(formatDateInput(entry.date))
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -153,7 +156,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
       </div>
 
       <Card><CardContent className="p-4">
-        <div className="mb-3 flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" /><h3 className="font-bold">{editingId ? 'Modifica registrazione' : 'Registra attività'}</h3>{editingId && <button type="button" className="ml-auto text-muted-foreground" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></button>}</div>
+        <div className="mb-3 flex items-center gap-2"><Clock3 className="h-4 w-4 text-primary" /><h3 className="font-bold">{editingId ? 'Modifica registrazione' : 'Registra attività'}</h3>{editingId && <button type="button" className="ml-auto text-muted-foreground" onClick={() => { setEditingId(null); setShowNotes(false); setForm({ ...emptyForm, jobId: form.jobId, date: today }); setDateInput(formatDateInput(today)) }}><X className="h-4 w-4" /></button>}</div>
         <form onSubmit={submitEntry} className="space-y-3">
           <Select value={form.jobId} onChange={(value) => updateForm('jobId', value)} required options={[{ value: '', label: 'Scegli un lavoro' }, ...jobs.map((job) => ({ value: job.id, label: `${job.name}${job.client ? ` · ${job.client}` : ' · Nessun cliente'} · ${formatCurrency(job.rate)}/h` }))]} />
           <div className="grid grid-cols-2 gap-2">
@@ -166,17 +169,39 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
           </div>
           {selectedJob?.overtimeEnabled && <p className="text-xs text-muted-foreground">Straordinari pagati {selectedJob.overtimeMultiplier}× ({formatCurrency(selectedJob.rate * selectedJob.overtimeMultiplier)}/h)</p>}
           {selectedJob?.presets.length ? <div className="flex flex-wrap gap-2">{selectedJob.presets.map((preset) => <button key={preset.id} type="button" onClick={() => setForm((current) => ({ ...current, start: preset.start, end: preset.end }))} className="rounded-lg border border-border bg-muted/60 px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/50">{preset.start} – {preset.end}</button>)}</div> : null}
-          <label className="block text-xs text-muted-foreground">
-            Note attività
-            <textarea
-              value={form.note}
-              onChange={(event) => updateForm('note', event.target.value)}
-              placeholder="Cosa hai fatto oggi?"
-              maxLength={1000}
-              rows={3}
-              className="mt-1 w-full resize-none rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary"
-            />
-          </label>
+          <div className="overflow-hidden rounded-xl border border-border bg-background/40">
+            <button
+              type="button"
+              onClick={() => setShowNotes((value) => !value)}
+              aria-expanded={showNotes}
+              aria-controls="entry-notes"
+              className="flex min-h-11 w-full items-center justify-between px-3 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span className="flex items-center gap-2">
+                <Plus className={`h-4 w-4 transition-transform duration-200 ${showNotes ? 'rotate-45' : ''}`} />
+                {showNotes ? 'Chiudi note' : form.note.trim() ? 'Modifica note' : 'Aggiungi note'}
+              </span>
+              {form.note.trim() && <span className="max-w-36 truncate rounded-full bg-primary/10 px-2 py-1 text-[10px] text-primary">{form.note.trim()}</span>}
+              {!form.note.trim() && <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showNotes ? 'rotate-180' : ''}`} />}
+            </button>
+            {showNotes && (
+              <div id="entry-notes" className="view-enter border-t border-border p-3">
+                <label className="block text-xs text-muted-foreground" htmlFor="entry-note">
+                  Note attività
+                  <textarea
+                    id="entry-note"
+                    value={form.note}
+                    onChange={(event) => updateForm('note', event.target.value)}
+                    placeholder="Cosa hai fatto oggi?"
+                    maxLength={1000}
+                    rows={3}
+                    autoFocus
+                    className="mt-2 w-full resize-none rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-primary"
+                  />
+                </label>
+              </div>
+            )}
+          </div>
           <Button type="submit" className="w-full" disabled={!selectedJob}>{editingId ? 'Salva modifiche' : 'Registra ora'}</Button>
         </form>
       </CardContent></Card>
