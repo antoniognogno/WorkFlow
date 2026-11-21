@@ -2,11 +2,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useState } from 'react'
-import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check, Eye, EyeOff, KeyRound, ArrowLeft, ChevronRight, Target } from 'lucide-react'
+import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check, Eye, EyeOff, KeyRound, ArrowLeft, ChevronRight, Target, RefreshCw } from 'lucide-react'
 import type { Theme } from '@/App'
 import { Select } from '@/components/ui/select'
 import { formatCurrency } from '@/lib/utils'
 import type { WorkGoals } from '@/lib/goals'
+import { PwaUpdatesView } from '@/components/pwa/PwaUpdateBanner'
 
 interface GoalJob {
   id: string
@@ -39,6 +40,7 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordView, setPasswordView] = useState(false)
   const [goalsView, setGoalsView] = useState(false)
+  const [updatesView, setUpdatesView] = useState(false)
   const [goalDraft, setGoalDraft] = useState<WorkGoals>(goals)
   const [savingGoals, setSavingGoals] = useState(false)
 
@@ -128,6 +130,21 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
             </Button>
           </CardContent>
         </Card>
+      </div>
+    )
+  }
+
+  if (updatesView) {
+    return (
+      <div className="view-enter space-y-4 pb-24">
+        <button type="button" onClick={() => setUpdatesView(false)} className="flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Profilo
+        </button>
+        <div>
+          <p className="text-sm text-muted-foreground">WorkFlow</p>
+          <h2 className="text-2xl font-black">Aggiornamenti e novità</h2>
+        </div>
+        <PwaUpdatesView />
       </div>
     )
   }
@@ -254,6 +271,11 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
         <Card><CardContent className="p-4"><ClipboardList className="h-4 w-4 text-primary" /><p className="mt-3 text-2xl font-black">{entriesCount}</p><p className="text-xs text-muted-foreground">Registrazioni</p></CardContent></Card>
       </div>
       <Card><CardContent className="flex items-start gap-3 p-4"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" /><div><p className="text-sm font-semibold">I tuoi dati sono protetti</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">L’accesso è riservato al tuo account e le operazioni sono protette dalle policy di sicurezza del database.</p></div></CardContent></Card>
+      <button type="button" onClick={() => setUpdatesView(true)} className="flex w-full items-center gap-3 rounded-2xl border border-border/80 bg-card p-4 text-left shadow-[var(--shadow-soft)] transition-colors hover:border-primary/40 hover:bg-surface-raised">
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary"><RefreshCw className="h-5 w-5" /></span>
+        <span className="flex-1"><span className="block text-sm font-semibold">Aggiornamenti e novità</span><span className="block text-xs text-muted-foreground">Novità recenti e nuova versione disponibile</span></span>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </button>
       <p className="flex items-center justify-center gap-1.5 pb-2 text-xs text-muted-foreground">
         Creato da Antonio con <Heart className="h-3.5 w-3.5 fill-rose-400 text-rose-400" aria-label="amore" /> per Anna
       </p>

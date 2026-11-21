@@ -13,7 +13,6 @@ import { db } from '@/db'
 import { pendingMutationsCount, queueMutation, syncPendingMutations } from '@/lib/offline-sync'
 import { getDefaultJobColor } from '@/lib/job-colors'
 import { defaultGoals, loadGoals, saveGoals, type WorkGoals } from '@/lib/goals'
-import { PwaUpdateBanner } from '@/components/pwa/PwaUpdateBanner'
 
 const ReportView = lazy(() =>
   import('@/components/report/ReportView').then((module) => ({ default: module.ReportView })),
@@ -866,7 +865,6 @@ export default function App() {
         </div>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />
-      <PwaUpdateBanner />
     </div>
   )
 }
