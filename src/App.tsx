@@ -12,6 +12,7 @@ import { Wifi, WifiOff } from 'lucide-react'
 import { db } from '@/db'
 import { pendingMutationsCount, queueMutation, syncPendingMutations } from '@/lib/offline-sync'
 import { getDefaultJobColor } from '@/lib/job-colors'
+import { defaultGoals, loadGoals, saveGoals, type WorkGoals } from '@/lib/goals'
 
 const ReportView = lazy(() =>
   import('@/components/report/ReportView').then((module) => ({ default: module.ReportView })),
@@ -135,6 +136,7 @@ export default function App() {
   const [trashEntries, setTrashEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  const [goals, setGoals] = useState<WorkGoals>(() => loadGoals())
   const displayName = session?.user.user_metadata?.display_name
     || localStorage.getItem('workflow-display-name')
     || session?.user.email?.split('@')[0]
@@ -162,6 +164,37 @@ export default function App() {
       return
     }
     toast.success('Password aggiornata')
+  }
+
+  const updateGoals = async (nextGoals: WorkGoals) => {
+    setGoals(nextGoals)
+    saveGoals(nextGoals)
+    if (!navigator.onLine) {
+      await queueMutation('updateGoals', {
+        values: {
+          monthly_hours_goal: nextGoals.monthlyHours,
+          monthly_earnings_goal: nextGoals.monthlyEarnings,
+          weekly_hours_goal: nextGoals.weeklyHours,
+          job_monthly_earnings_goals: nextGoals.jobMonthlyEarnings,
+        },
+      })
+      await refreshPendingCount()
+      toast.success('Obiettivi salvati offline')
+      return
+    }
+    if (!session) return
+    const { error } = await supabase.from('settings').upsert({
+      user_id: session.user.id,
+      monthly_hours_goal: nextGoals.monthlyHours,
+      monthly_earnings_goal: nextGoals.monthlyEarnings,
+      weekly_hours_goal: nextGoals.weeklyHours,
+      job_monthly_earnings_goals: nextGoals.jobMonthlyEarnings,
+    })
+    if (error) {
+      toast.error(error.message)
+      return
+    }
+    toast.success('Obiettivi aggiornati')
   }
 
   useEffect(() => {
@@ -264,10 +297,11 @@ export default function App() {
     if (cleanupResult.error && !isMissingColumnError(cleanupResult.error.message, 'deleted_at')) {
       toast.error(cleanupResult.error.message)
     }
-    const [jobsWithOvertime, presetsResult, entriesWithFeatures] = await Promise.all([
+    const [jobsWithOvertime, presetsResult, entriesWithFeatures, settingsResult] = await Promise.all([
       supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier,color').order('name'),
       supabase.from('presets').select('id,job_id,start_time,end_time'),
       supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,paid_at,payment_method,payment_note,deleted_at,note').order('date', { ascending: false }),
+      supabase.from('settings').select('monthly_hours_goal,monthly_earnings_goal,weekly_hours_goal,job_monthly_earnings_goals').maybeSingle(),
     ])
     let jobsData = (jobsWithOvertime.data ?? []) as RemoteJob[]
     let jobsError = jobsWithOvertime.error
@@ -303,6 +337,16 @@ export default function App() {
     }
     const remoteJobs = jobsData
     const remotePresets = (presetsResult.data ?? []) as RemotePreset[]
+    if (settingsResult.data) {
+      const remoteGoals: WorkGoals = {
+        monthlyHours: Number(settingsResult.data.monthly_hours_goal ?? defaultGoals.monthlyHours),
+        monthlyEarnings: Number(settingsResult.data.monthly_earnings_goal ?? defaultGoals.monthlyEarnings),
+        weeklyHours: Number(settingsResult.data.weekly_hours_goal ?? defaultGoals.weeklyHours),
+        jobMonthlyEarnings: (settingsResult.data.job_monthly_earnings_goals as Record<string, number>) ?? {},
+      }
+      setGoals(remoteGoals)
+      saveGoals(remoteGoals)
+    }
     setJobs(remoteJobs.map((job) => ({
       id: job.id,
       name: job.name,
@@ -796,7 +840,7 @@ export default function App() {
           {currentTab === 'payments' && <PaymentsView jobs={jobs} entries={entries} onMarkEntriesPaid={markEntriesPaid} onUpdatePayment={updatePayment} onCancelPayment={cancelPayment} />}
           {currentTab === 'jobs' && <JobsView jobs={jobs} onCreateJob={createJob} onUpdateJob={updateJob} onDeleteJob={deleteJob} onAddPreset={addPreset} onDeletePreset={deletePreset} />}
           {currentTab === 'msg' && <MessageView jobs={jobs} entries={entries} />}
-          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} />}
+          {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} displayName={displayName} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} onDisplayNameChange={updateDisplayName} onPasswordChange={updatePassword} goals={goals} jobs={jobs.map((job) => ({ id: job.id, name: job.name, client: job.client }))} onGoalsChange={updateGoals} />}
         </div>}
       </main>
       <BottomNav currentTab={currentTab} onTabChange={changeTab} />

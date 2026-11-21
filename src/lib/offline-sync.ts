@@ -68,6 +68,13 @@ export const syncPendingMutations = async (): Promise<number> => {
         case 'cancelPayment':
           result = await supabase.from('entries').update({ paid: false, paid_at: null, payment_method: null, payment_note: null }).eq('id', String(payload.id))
           break
+        case 'updateGoals': {
+          const { data: { user } } = await supabase.auth.getUser()
+          result = user
+            ? await supabase.from('settings').upsert({ user_id: user.id, ...(payload.values as Record<string, unknown>) })
+            : { error: { message: 'Sessione non disponibile' } }
+          break
+        }
       }
 
       if (!result || result.error) break

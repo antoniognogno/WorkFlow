@@ -120,6 +120,7 @@ The main database schema is in [supabase/schema.sql](./supabase/schema.sql). Exi
 2. [supabase/migration-payment-details.sql](./supabase/migration-payment-details.sql)
 3. [supabase/migration-job-colors.sql](./supabase/migration-job-colors.sql)
 4. [supabase/migration-entry-notes.sql](./supabase/migration-entry-notes.sql)
+5. [supabase/migration-goals.sql](./supabase/migration-goals.sql)
 
 The application uses RLS policies based on `auth.uid() = user_id`, so users can only access their own data through the client application.
 

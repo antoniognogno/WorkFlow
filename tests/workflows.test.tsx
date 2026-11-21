@@ -143,6 +143,7 @@ describe('main user workflows', () => {
 
     render(<ReportView jobs={[job, secondJob]} entries={[entry, secondEntry]} />)
 
+    await user.click(screen.getByRole('button', { name: 'Dettaglio' }))
     await user.click(screen.getByRole('checkbox', { name: /Raggruppa nel riepilogo/ }))
 
     expect(screen.getAllByText('Babysitter').length).toBeGreaterThan(0)
