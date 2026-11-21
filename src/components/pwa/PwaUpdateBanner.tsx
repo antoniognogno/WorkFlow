@@ -72,6 +72,7 @@ export function PwaUpdatesView() {
             <p className="text-sm font-bold">Novità recenti</p>
           </div>
           <ul className="space-y-2 text-xs leading-relaxed text-muted-foreground">
+            <li>• Attività ed estratto conto con card più moderne e leggibili.</li>
             <li>• Calendario mensile e obiettivi settimanali intelligenti.</li>
             <li>• Dashboard pagamenti con incassi e cliente più redditizio.</li>
             <li>• Note attività, colori lavori e grafici più chiari.</li>
