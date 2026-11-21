@@ -6,13 +6,15 @@ import { formatCurrency, formatDateItalian, formatDuration, getPeriodRange, DAY_
 import { ChevronLeft, ChevronRight, Share2, Copy, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select } from '@/components/ui/select'
-import { Area, AreaChart, Bar, BarChart, CartesianGrid, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import { getDefaultJobColor } from '@/lib/job-colors'
 
 interface Job {
   id: string
   name: string
   client: string
   rate: number
+  color: string
 }
 
 interface Entry {
@@ -60,7 +62,8 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
       ? getRollingRange(30)
       : getPeriodRange(period, offset, customFrom, customTo)
 
-  const getJob = (id: string) => jobs.find((j) => j.id === id) || { name: '?', client: '', rate: 0 }
+  const getJob = (id: string): Job =>
+    jobs.find((j) => j.id === id) || { id: '', name: '?', client: '', rate: 0, color: getDefaultJobColor(0) }
 
   // Filtro temporale ed entità
   const filteredEntries = entries
@@ -78,10 +81,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   const totalPay = filteredEntries.reduce((acc, cur) => acc + (cur.minutes / 60) * cur.rate + (cur.overtimeMinutes / 60) * (cur.overtimeRate || cur.rate), 0)
   // Ripartizione per lavoro/cliente
   const breakdown: Record<string, number> = {}
+  const breakdownColors: Record<string, string> = {}
   filteredEntries.forEach((e) => {
     const j = getJob(e.jobId)
     const key = groupSameName ? j.name : `${j.name}${j.client ? ` · ${j.client}` : ''}`
     breakdown[key] = (breakdown[key] || 0) + (e.minutes / 60) * e.rate + (e.overtimeMinutes / 60) * (e.overtimeRate || e.rate)
+    breakdownColors[key] = j.color || getDefaultJobColor(jobs.indexOf(j))
   })
 
   const trendData = useMemo(() => {
@@ -103,7 +108,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
   }, [filteredEntries])
 
   const breakdownData = Object.entries(breakdown)
-    .map(([name, value]) => ({ name, value: Number(value.toFixed(2)) }))
+    .map(([name, value]) => ({
+      name,
+      value: Number(value.toFixed(2)),
+      color: breakdownColors[name] || '#7aa6bd',
+    }))
     .sort((first, second) => second.value - first.value)
     .slice(0, 6)
 
@@ -339,23 +348,27 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
         </Card>
       )}
 
-      {trendData.length > 0 && (
+      {breakdownData.length > 0 && (
         <Card>
           <CardContent className="p-4">
-            <p className="text-sm font-bold">Ore registrate</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">Ore lavorate giorno per giorno</p>
+            <p className="text-sm font-bold">Guadagni per lavoro</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">Scopri subito quali lavori rendono di più</p>
             <div className="mt-3 h-40 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: -24 }}>
+                <BarChart data={breakdownData} layout="vertical" margin={{ top: 4, right: 8, bottom: 0, left: 2 }}>
                   <CartesianGrid stroke="var(--border)" strokeOpacity={0.55} vertical={false} />
-                  <XAxis dataKey="date" tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} minTickGap={18} />
-                  <YAxis tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <XAxis type="number" tick={{ fill: 'var(--muted)', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="name" width={82} tick={{ fill: 'var(--muted)', fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(value) => String(value).slice(0, 11)} />
                   <Tooltip
                     cursor={{ fill: 'var(--primary)', fillOpacity: 0.06 }}
                     contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
-                    formatter={(value) => [`${Number(value).toFixed(1)} h`, 'Ore']}
+                    formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
                   />
-                  <Bar dataKey="hours" fill="#7aa6bd" radius={[8, 8, 2, 2]} />
+                  <Bar dataKey="value" radius={[0, 8, 8, 0]}>
+                    {breakdownData.map((item) => (
+                      <Cell key={item.name} fill={item.color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -375,7 +388,11 @@ export const ReportView: React.FC<ReportViewProps> = ({ jobs, entries }) => {
                     contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 12, fontSize: 12 }}
                     formatter={(value) => [formatCurrency(Number(value)), 'Guadagno']}
                   />
-                  <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} fill="#7aa6bd" labelLine={false} />
+                  <Pie data={breakdownData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={38} outerRadius={64} paddingAngle={3} labelLine={false}>
+                    {breakdownData.map((item) => (
+                      <Cell key={item.name} fill={item.color} />
+                    ))}
+                  </Pie>
                 </PieChart>
               </ResponsiveContainer>
             </div>

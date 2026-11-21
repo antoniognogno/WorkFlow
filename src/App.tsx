@@ -9,6 +9,9 @@ import { MessageView } from '@/components/message/MessageView'
 import { ProfileView } from '@/components/profile/ProfileView'
 import { PaymentsView } from '@/components/payments/PaymentsView'
 import { Wifi, WifiOff } from 'lucide-react'
+import { db } from '@/db'
+import { pendingMutationsCount, queueMutation, syncPendingMutations } from '@/lib/offline-sync'
+import { getDefaultJobColor } from '@/lib/job-colors'
 
 const ReportView = lazy(() =>
   import('@/components/report/ReportView').then((module) => ({ default: module.ReportView })),
@@ -52,6 +55,7 @@ interface Job {
   rate: number
   overtimeEnabled: boolean
   overtimeMultiplier: number
+  color: string
   presets: Array<{ id: string; start: string; end: string }>
 }
 
@@ -80,6 +84,7 @@ interface RemoteJob {
   rate: number
   overtime_enabled: boolean
   overtime_multiplier: number
+  color: string | null
 }
 
 interface RemotePreset {
@@ -127,10 +132,15 @@ export default function App() {
   const [entries, setEntries] = useState<Entry[]>([])
   const [trashEntries, setTrashEntries] = useState<Entry[]>([])
   const [loading, setLoading] = useState(true)
+  const [pendingSyncCount, setPendingSyncCount] = useState(0)
   const displayName = session?.user.user_metadata?.display_name
     || localStorage.getItem('workflow-display-name')
     || session?.user.email?.split('@')[0]
     || 'utente'
+
+  const refreshPendingCount = async () => {
+    setPendingSyncCount(await pendingMutationsCount())
+  }
 
   const updateDisplayName = async (nextName: string) => {
     const { data, error } = await supabase.auth.updateUser({ data: { display_name: nextName } })
@@ -155,13 +165,30 @@ export default function App() {
     return () => listener.subscription.unsubscribe()
   }, [])
 
+  useEffect(() => {
+    void refreshPendingCount()
+    if (navigator.onLine) {
+      void syncPendingMutations().then((synced) => {
+        if (synced > 0) toast.success(`${synced} modifiche sincronizzate`)
+        void refreshPendingCount()
+      })
+    }
+  }, [])
+
   const changeTab = (tab: TabType) => {
     setCurrentTab(tab)
     localStorage.setItem('workflow-current-tab', tab)
   }
 
   useEffect(() => {
-    const online = () => setIsOnline(true)
+    const online = () => {
+      setIsOnline(true)
+      void syncPendingMutations().then((synced) => {
+        if (synced > 0) toast.success(`${synced} modifiche sincronizzate`)
+        void refreshPendingCount()
+        void loadData()
+      })
+    }
     const offline = () => setIsOnline(false)
     window.addEventListener('online', online)
     window.addEventListener('offline', offline)
@@ -181,6 +208,44 @@ export default function App() {
   const loadData = useCallback(async () => {
     if (!session) return
     setLoading(true)
+    if (!navigator.onLine) {
+      const [localJobs, localPresets, localEntries] = await Promise.all([
+        db.jobs.toArray(),
+        db.presets.toArray(),
+        db.entries.toArray(),
+      ])
+      setJobs(localJobs.map((job) => ({
+        id: job.id,
+        name: job.name,
+        client: job.client,
+        rate: job.rate,
+        overtimeEnabled: job.overtimeEnabled,
+        overtimeMultiplier: job.overtimeMultiplier,
+        color: job.color,
+        presets: localPresets.filter((preset) => preset.jobId === job.id).map((preset) => ({ id: preset.id, start: preset.startTime, end: preset.endTime })),
+      })))
+      const mappedLocalEntries = localEntries.map((entry) => ({
+        id: entry.id,
+        jobId: entry.jobId,
+        date: entry.date,
+        start: entry.startTime,
+        end: entry.endTime,
+        minutes: entry.minutes,
+        rate: entry.rate,
+        paid: entry.paid,
+        paidAt: entry.paidAt,
+        paymentMethod: entry.paymentMethod,
+        paymentNote: entry.paymentNote,
+        breakMinutes: entry.breakMinutes,
+        overtimeMinutes: entry.overtimeMinutes,
+        overtimeRate: entry.overtimeRate,
+        deletedAt: entry.deletedAt,
+      }))
+      setEntries(mappedLocalEntries.filter((entry) => !entry.deletedAt))
+      setTrashEntries(mappedLocalEntries.filter((entry) => entry.deletedAt))
+      setLoading(false)
+      return
+    }
     const expiry = new Date()
     expiry.setDate(expiry.getDate() - 30)
     const cleanupResult = await supabase.from('entries').delete().lt('deleted_at', expiry.toISOString())
@@ -188,14 +253,19 @@ export default function App() {
       toast.error(cleanupResult.error.message)
     }
     const [jobsWithOvertime, presetsResult, entriesWithFeatures] = await Promise.all([
-      supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier').order('name'),
+      supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier,color').order('name'),
       supabase.from('presets').select('id,job_id,start_time,end_time'),
       supabase.from('entries').select('id,job_id,date,start_time,end_time,minutes,rate,break_minutes,overtime_minutes,overtime_rate,paid,paid_at,payment_method,payment_note,deleted_at').order('date', { ascending: false }),
     ])
     let jobsData = (jobsWithOvertime.data ?? []) as RemoteJob[]
     let jobsError = jobsWithOvertime.error
     if (jobsWithOvertime.error?.message.includes('overtime_enabled')) {
-      const fallbackJobs = await supabase.from('jobs').select('id,name,client,rate').order('name')
+      const fallbackJobs = await supabase.from('jobs').select('id,name,client,rate,color').order('name')
+      jobsData = (fallbackJobs.data ?? []) as RemoteJob[]
+      jobsError = fallbackJobs.error
+    }
+    if (jobsError?.message.includes('color')) {
+      const fallbackJobs = await supabase.from('jobs').select('id,name,client,rate,overtime_enabled,overtime_multiplier').order('name')
       jobsData = (fallbackJobs.data ?? []) as RemoteJob[]
       jobsError = fallbackJobs.error
     }
@@ -227,6 +297,7 @@ export default function App() {
       rate: Number(job.rate),
       overtimeEnabled: job.overtime_enabled ?? false,
       overtimeMultiplier: Number(job.overtime_multiplier ?? 1.5),
+      color: job.color ?? getDefaultJobColor(remoteJobs.indexOf(job)),
       presets: remotePresets.filter((preset) => preset.job_id === job.id).map((preset) => ({ id: preset.id, start: preset.start_time.slice(0, 5), end: preset.end_time.slice(0, 5) })),
     })))
     const mappedEntries = entriesData.map((entry) => ({
@@ -236,6 +307,49 @@ export default function App() {
     }))
     setEntries(mappedEntries.filter((entry) => !entry.deletedAt))
     setTrashEntries(mappedEntries.filter((entry) => entry.deletedAt))
+    await db.transaction('rw', db.jobs, db.presets, db.entries, async () => {
+      await db.jobs.clear()
+      await db.jobs.bulkPut(remoteJobs.map((job, index) => ({
+        id: job.id,
+        name: job.name,
+        client: job.client ?? '',
+        rate: Number(job.rate),
+        overtimeEnabled: job.overtime_enabled ?? false,
+        overtimeMultiplier: Number(job.overtime_multiplier ?? 1.5),
+        color: job.color ?? getDefaultJobColor(index),
+        synced: true,
+        updatedAt: new Date().toISOString(),
+      })))
+      await db.presets.clear()
+      await db.presets.bulkPut(remotePresets.map((preset) => ({
+        id: preset.id,
+        jobId: preset.job_id,
+        startTime: preset.start_time.slice(0, 5),
+        endTime: preset.end_time.slice(0, 5),
+        synced: true,
+      })))
+      await db.entries.clear()
+      await db.entries.bulkPut(mappedEntries.map((entry) => ({
+        id: entry.id,
+        jobId: entry.jobId,
+        date: entry.date,
+        startTime: entry.start,
+        endTime: entry.end,
+        minutes: entry.minutes,
+        rate: entry.rate,
+        paid: entry.paid,
+        paidAt: entry.paidAt,
+        paymentMethod: entry.paymentMethod,
+        paymentNote: entry.paymentNote,
+        breakMinutes: entry.breakMinutes,
+        overtimeMinutes: entry.overtimeMinutes,
+        overtimeRate: entry.overtimeRate,
+        deletedAt: entry.deletedAt,
+        synced: true,
+        updatedAt: new Date().toISOString(),
+      })))
+    })
+    await refreshPendingCount()
     setLoading(false)
   }, [session])
 
@@ -243,11 +357,35 @@ export default function App() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadData() }, [loadData])
 
+  const syncNow = async () => {
+    if (!navigator.onLine) {
+      toast.info('Torni online per sincronizzare le modifiche')
+      return
+    }
+    const synced = await syncPendingMutations()
+    await refreshPendingCount()
+    await loadData()
+    if (synced > 0) toast.success(`${synced} modifiche sincronizzate`)
+  }
+
   if (authLoading) return <AppLoading />
   if (!session) return <AuthView />
 
-  const createJob = async (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number) => {
-    let { error } = await supabase.from('jobs').insert({ user_id: session.user.id, name, client: client || null, rate, overtime_enabled: overtimeEnabled, overtime_multiplier: overtimeMultiplier })
+  const createJob = async (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, color?: string) => {
+    const jobColor = color || getDefaultJobColor(jobs.length)
+    if (!navigator.onLine) {
+      const id = crypto.randomUUID()
+      await db.jobs.put({
+        id, name, client, rate, overtimeEnabled, overtimeMultiplier,
+        color: jobColor, synced: false, updatedAt: new Date().toISOString(),
+      })
+      await queueMutation('createJob', { id, user_id: session.user.id, name, client: client || null, rate, overtime_enabled: overtimeEnabled, overtime_multiplier: overtimeMultiplier, color: jobColor })
+      await loadData()
+      await refreshPendingCount()
+      toast.success('Lavoro salvato offline')
+      return
+    }
+    let { error } = await supabase.from('jobs').insert({ user_id: session.user.id, name, client: client || null, rate, overtime_enabled: overtimeEnabled, overtime_multiplier: overtimeMultiplier, color: jobColor })
     if (error?.message.includes('overtime_enabled')) {
       const fallback = await supabase.from('jobs').insert({ user_id: session.user.id, name, client: client || null, rate })
       error = fallback.error
@@ -260,13 +398,34 @@ export default function App() {
     await loadData()
   }
 
-  const updateJob = async (id: string, name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, applyToEntries: boolean) => {
+  const updateJob = async (id: string, name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, applyToEntries: boolean, color: string) => {
+    if (!navigator.onLine) {
+      const localJob = await db.jobs.get(id)
+      if (localJob) await db.jobs.put({ ...localJob, name, client, rate, overtimeEnabled, overtimeMultiplier, color, synced: false, updatedAt: new Date().toISOString() })
+      if (applyToEntries) {
+        await db.entries.where('jobId').equals(id).modify((entry) => {
+          entry.rate = rate
+          entry.overtimeRate = overtimeEnabled ? rate * overtimeMultiplier : rate
+          entry.synced = false
+          entry.updatedAt = new Date().toISOString()
+        })
+      }
+      await queueMutation('updateJob', { id, values: { name, client: client || null, rate, overtime_enabled: overtimeEnabled, overtime_multiplier: overtimeMultiplier, color } })
+      if (applyToEntries) {
+        await queueMutation('updateEntry', { id: '__apply_job_entries__', values: { rate, overtime_rate: overtimeEnabled ? rate * overtimeMultiplier : rate }, jobId: id, applyToJobEntries: true })
+      }
+      await loadData()
+      await refreshPendingCount()
+      toast.success('Lavoro aggiornato offline')
+      return
+    }
     const { error } = await supabase.from('jobs').update({
       name,
       client: client || null,
       rate,
       overtime_enabled: overtimeEnabled,
       overtime_multiplier: overtimeMultiplier,
+      color,
     }).eq('id', id)
     if (error) {
       toast.error(error.message)
@@ -287,6 +446,14 @@ export default function App() {
   }
 
   const deleteJob = async (id: string) => {
+    if (!navigator.onLine) {
+      await db.jobs.delete(id)
+      await db.presets.where('jobId').equals(id).delete()
+      await queueMutation('deleteJob', { id })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('jobs').delete().eq('id', id)
     if (error) {
       toast.error('Non puoi eliminare un lavoro con registrazioni collegate.')
@@ -297,6 +464,14 @@ export default function App() {
   }
 
   const addPreset = async (jobId: string, start: string, end: string) => {
+    if (!navigator.onLine) {
+      const id = crypto.randomUUID()
+      await db.presets.put({ id, jobId, startTime: start, endTime: end, synced: false })
+      await queueMutation('addPreset', { id, job_id: jobId, user_id: session.user.id, start_time: start, end_time: end })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('presets').insert({ job_id: jobId, user_id: session.user.id, start_time: start, end_time: end })
     if (error) {
       toast.error(error.message)
@@ -307,6 +482,13 @@ export default function App() {
   }
 
   const deletePreset = async (id: string) => {
+    if (!navigator.onLine) {
+      await db.presets.delete(id)
+      await queueMutation('deletePreset', { id })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('presets').delete().eq('id', id)
     if (error) {
       toast.error(error.message)
@@ -319,6 +501,25 @@ export default function App() {
   const addEntry = async (jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => {
     const job = jobs.find((item) => item.id === jobId)
     const overtimeRate = job?.overtimeEnabled ? (job.rate * job.overtimeMultiplier) : job?.rate ?? 0
+    if (!navigator.onLine) {
+      const id = crypto.randomUUID()
+      const minutes = Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes)
+      await db.entries.put({
+        id, jobId, date, startTime: start, endTime: end, minutes, rate: job?.rate ?? 0,
+        paid: false, paidAt: null, paymentMethod: null, paymentNote: null,
+        breakMinutes, overtimeMinutes, overtimeRate, deletedAt: null, synced: false,
+        updatedAt: new Date().toISOString(),
+      })
+      await queueMutation('addEntry', {
+        id, user_id: session.user.id, job_id: jobId, date, start_time: start, end_time: end,
+        minutes, rate: job?.rate ?? 0, break_minutes: breakMinutes, overtime_minutes: overtimeMinutes,
+        overtime_rate: overtimeRate, paid: false,
+      })
+      await loadData()
+      await refreshPendingCount()
+      toast.success('Registrazione salvata offline')
+      return
+    }
     let { error } = await supabase.from('entries').insert({
       user_id: session.user.id, job_id: jobId, date, start_time: start, end_time: end,
       minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes), rate: job?.rate ?? 0,
@@ -341,6 +542,29 @@ export default function App() {
 
   const updateEntry = async (id: string, jobId: string, date: string, start: string, end: string, breakMinutes: number, overtimeMinutes: number) => {
     const job = jobs.find((item) => item.id === jobId)
+    if (!navigator.onLine) {
+      const localEntry = await db.entries.get(id)
+      if (localEntry) await db.entries.put({
+        ...localEntry, jobId, date, startTime: start, endTime: end,
+        minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
+        rate: job?.rate ?? 0, breakMinutes, overtimeMinutes,
+        overtimeRate: job?.overtimeEnabled ? job.rate * job.overtimeMultiplier : job?.rate ?? 0,
+        synced: false, updatedAt: new Date().toISOString(),
+      })
+      await queueMutation('updateEntry', {
+        id,
+        values: {
+          job_id: jobId, date, start_time: start, end_time: end,
+          minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
+          rate: job?.rate ?? 0, break_minutes: breakMinutes, overtime_minutes: overtimeMinutes,
+          overtime_rate: job?.overtimeEnabled ? job.rate * job.overtimeMultiplier : job?.rate ?? 0,
+        },
+      })
+      await loadData()
+      await refreshPendingCount()
+      toast.success('Registrazione aggiornata offline')
+      return
+    }
     let { error } = await supabase.from('entries').update({
       job_id: jobId, date, start_time: start, end_time: end,
       minutes: Math.max(0, minutesBetween(start, end) - breakMinutes - overtimeMinutes),
@@ -364,6 +588,14 @@ export default function App() {
   }
 
   const deleteEntry = async (id: string) => {
+    if (!navigator.onLine) {
+      const deletedAt = new Date().toISOString()
+      await db.entries.update(id, { deletedAt, synced: false, updatedAt: deletedAt })
+      await queueMutation('deleteEntry', { id, deleted_at: deletedAt })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('entries').update({ deleted_at: new Date().toISOString() }).eq('id', id)
     if (error) {
       if (isMissingColumnError(error.message, 'deleted_at')) {
@@ -377,6 +609,13 @@ export default function App() {
   }
 
   const restoreEntry = async (id: string) => {
+    if (!navigator.onLine) {
+      await db.entries.update(id, { deletedAt: null, synced: false, updatedAt: new Date().toISOString() })
+      await queueMutation('restoreEntry', { id })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('entries').update({ deleted_at: null }).eq('id', id)
     if (error) {
       if (isMissingColumnError(error.message, 'deleted_at')) {
@@ -391,6 +630,13 @@ export default function App() {
   }
 
   const permanentlyDeleteEntry = async (id: string) => {
+    if (!navigator.onLine) {
+      await db.entries.delete(id)
+      await queueMutation('permanentlyDeleteEntry', { id })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('entries').delete().eq('id', id)
     if (error) {
       toast.error(error.message)
@@ -402,6 +648,21 @@ export default function App() {
   const markEntriesPaid = async (ids: string[], paidDate: string, paymentMethod: string | null, paymentNote: string | null) => {
     const uniqueIds = [...new Set(ids)].filter(Boolean)
     if (uniqueIds.length === 0) return
+    if (!navigator.onLine) {
+      const paidAt = new Date(`${paidDate}T12:00:00`).toISOString()
+      await db.entries.bulkUpdate(uniqueIds.map((id) => ({
+        key: id,
+        changes: { paid: true, paidAt, paymentMethod, paymentNote, synced: false, updatedAt: new Date().toISOString() },
+      })))
+      await queueMutation('markEntriesPaid', {
+        ids: uniqueIds,
+        values: { paid: true, paid_at: paidAt, payment_method: paymentMethod, payment_note: paymentNote },
+      })
+      await loadData()
+      await refreshPendingCount()
+      toast.success('Pagamento salvato offline')
+      return
+    }
 
     const { error } = await supabase
       .from('entries')
@@ -422,6 +683,14 @@ export default function App() {
   }
 
   const updatePayment = async (id: string, paidDate: string, paymentMethod: string | null, paymentNote: string | null) => {
+    if (!navigator.onLine) {
+      const paidAt = new Date(`${paidDate}T12:00:00`).toISOString()
+      await db.entries.update(id, { paidAt, paymentMethod, paymentNote, synced: false, updatedAt: new Date().toISOString() })
+      await queueMutation('updatePayment', { id, values: { paid_at: paidAt, payment_method: paymentMethod, payment_note: paymentNote } })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('entries').update({
       paid_at: new Date(`${paidDate}T12:00:00`).toISOString(),
       payment_method: paymentMethod,
@@ -436,6 +705,13 @@ export default function App() {
   }
 
   const cancelPayment = async (id: string) => {
+    if (!navigator.onLine) {
+      await db.entries.update(id, { paid: false, paidAt: null, paymentMethod: null, paymentNote: null, synced: false, updatedAt: new Date().toISOString() })
+      await queueMutation('cancelPayment', { id })
+      await loadData()
+      await refreshPendingCount()
+      return
+    }
     const { error } = await supabase.from('entries').update({
       paid: false,
       paid_at: null,
@@ -460,6 +736,11 @@ export default function App() {
             <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] ${isOnline ? 'text-emerald-500' : 'text-amber-500'}`}>
               {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{isOnline ? 'Online' : 'Offline'}
             </span>
+            {pendingSyncCount > 0 && (
+              <button type="button" onClick={() => void syncNow()} className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-500 transition-colors hover:bg-amber-500/25" title="Sincronizza modifiche ora">
+                {pendingSyncCount} da sincronizzare
+              </button>
+            )}
           </div>
           <button type="button" className="max-w-36 truncate rounded-lg px-2 py-1 text-right text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={() => changeTab('profile')}>
             Ciao, {displayName}

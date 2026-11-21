@@ -39,7 +39,7 @@ interface RegisterViewProps {
   onDeleteEntry: (id: string) => Promise<void>
   onRestoreEntry: (id: string) => Promise<void>
   onPermanentlyDeleteEntry: (id: string) => Promise<void>
-  onCreateJob: (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number) => Promise<void>
+  onCreateJob: (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number, color?: string) => Promise<void>
 }
 
 const emptyForm = { jobId: '', date: '', start: '16:00', end: '18:00', breakMinutes: '0', overtimeMinutes: '0' }

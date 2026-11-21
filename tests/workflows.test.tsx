@@ -13,6 +13,7 @@ const job = {
   rate: 15,
   overtimeEnabled: false,
   overtimeMultiplier: 1.5,
+  color: '#7aa6bd',
   presets: [],
 }
 
@@ -46,7 +47,7 @@ describe('main user workflows', () => {
     await user.type(screen.getByPlaceholderText('Tariffa €/ora'), '10')
     await user.click(screen.getByRole('button', { name: 'Crea' }))
 
-    expect(onCreateJob).toHaveBeenCalledWith('Pattinaggio', 'ASD Pieris', 10, false, 1.5)
+    expect(onCreateJob).toHaveBeenCalledWith('Pattinaggio', 'ASD Pieris', 10, false, 1.5, '#7aa6bd')
   })
 
   it('edits a job without applying changes to historical entries', async () => {
@@ -60,7 +61,7 @@ describe('main user workflows', () => {
     await user.type(nameInput, 'Baby Sitter')
     await user.click(screen.getByRole('button', { name: /Salva/ }))
 
-    expect(onUpdateJob).toHaveBeenCalledWith('job-1', 'Baby Sitter', 'Martina', 15, false, 1.5, false)
+    expect(onUpdateJob).toHaveBeenCalledWith('job-1', 'Baby Sitter', 'Martina', 15, false, 1.5, false, '#7aa6bd')
   })
 
   it('adds a work entry with normalized time and break values', async () => {
