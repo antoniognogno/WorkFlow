@@ -13,6 +13,35 @@ import { Wifi, WifiOff } from 'lucide-react'
 
 export type Theme = 'dark' | 'light'
 
+const tabIds: TabType[] = ['reg', 'rep', 'payments', 'jobs', 'msg', 'profile']
+
+const getStoredTab = (): TabType => {
+  const storedTab = localStorage.getItem('workflow-current-tab')
+  return tabIds.includes(storedTab as TabType) ? (storedTab as TabType) : 'reg'
+}
+
+function AppLoading() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background text-foreground">
+      <div className="flex flex-col items-center gap-5" role="status" aria-label="Caricamento WorkFlow">
+        <div className="relative">
+          <div className="absolute inset-0 animate-ping rounded-[28px] bg-primary/15" />
+          <img
+            src="/workflow-logo.svg"
+            alt="WorkFlow"
+            className="relative h-24 w-24 rounded-[28px] shadow-[0_18px_50px_rgba(64,168,200,0.22)]"
+          />
+        </div>
+        <div className="flex items-center gap-1.5" aria-hidden="true">
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.24s]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary [animation-delay:-0.12s]" />
+          <span className="h-2 w-2 animate-bounce rounded-full bg-primary" />
+        </div>
+      </div>
+    </main>
+  )
+}
+
 interface Job {
   id: string
   name: string
@@ -87,8 +116,9 @@ const isMissingColumnError = (message: string | undefined, column: string) =>
 
 export default function App() {
   const [session, setSession] = useState<Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']>(null)
+  const [authLoading, setAuthLoading] = useState(true)
   const [theme, setTheme] = useState<Theme>(() => localStorage.getItem('workflow-theme') === 'light' ? 'light' : 'dark')
-  const [currentTab, setCurrentTab] = useState<TabType>('reg')
+  const [currentTab, setCurrentTab] = useState<TabType>(getStoredTab)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [jobs, setJobs] = useState<Job[]>([])
   const [entries, setEntries] = useState<Entry[]>([])
@@ -96,10 +126,21 @@ export default function App() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    void supabase.auth.getSession().then(({ data }) => setSession(data.session))
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession))
+    void supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setAuthLoading(false)
+    })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession)
+      setAuthLoading(false)
+    })
     return () => listener.subscription.unsubscribe()
   }, [])
+
+  const changeTab = (tab: TabType) => {
+    setCurrentTab(tab)
+    localStorage.setItem('workflow-current-tab', tab)
+  }
 
   useEffect(() => {
     const online = () => setIsOnline(true)
@@ -184,6 +225,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { void loadData() }, [loadData])
 
+  if (authLoading) return <AppLoading />
   if (!session) return <AuthView />
 
   const createJob = async (name: string, client: string, rate: number, overtimeEnabled: boolean, overtimeMultiplier: number) => {
@@ -401,7 +443,7 @@ export default function App() {
               {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}{isOnline ? 'Online' : 'Offline'}
             </span>
           </div>
-          <button type="button" className="max-w-36 truncate rounded-lg px-2 py-1 text-right text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={() => setCurrentTab('profile')}>
+          <button type="button" className="max-w-36 truncate rounded-lg px-2 py-1 text-right text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground" onClick={() => changeTab('profile')}>
             Ciao, {session.user.email ?? 'utente'}
           </button>
         </div>
@@ -416,7 +458,7 @@ export default function App() {
           {currentTab === 'profile' && <ProfileView email={session.user.email ?? 'utente'} theme={theme} jobsCount={jobs.length} entriesCount={entries.length} onThemeChange={setTheme} onSignOut={() => void supabase.auth.signOut()} />}
         </>}
       </main>
-      <BottomNav currentTab={currentTab} onTabChange={setCurrentTab} />
+      <BottomNav currentTab={currentTab} onTabChange={changeTab} />
     </div>
   )
 }
