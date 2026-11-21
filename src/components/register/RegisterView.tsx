@@ -86,6 +86,7 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
   const [newJobOvertime, setNewJobOvertime] = useState(false)
   const [newJobMultiplier, setNewJobMultiplier] = useState('1.5')
   const [dateInput, setDateInput] = useState(formatDateInput(today))
+  const [trashConfirmation, setTrashConfirmation] = useState<{ type: 'restore' | 'delete'; entry: Entry } | null>(null)
   const selectedJob = jobs.find((job) => job.id === form.jobId)
   const sortedEntries = useMemo(() => [...entries].sort((a, b) => `${b.date}${b.start}`.localeCompare(`${a.date}${a.start}`)), [entries])
   const visibleEntries = showAll ? sortedEntries : sortedEntries.slice(0, 5)
@@ -124,6 +125,15 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
     setNewJobClient('')
     setNewJobRate('')
     setNewJobOvertime(false)
+  }
+  const confirmTrashAction = async () => {
+    if (!trashConfirmation) return
+    if (trashConfirmation.type === 'restore') {
+      await onRestoreEntry(trashConfirmation.entry.id)
+    } else {
+      await onPermanentlyDeleteEntry(trashConfirmation.entry.id)
+    }
+    setTrashConfirmation(null)
   }
 
   return (
@@ -182,10 +192,67 @@ export const RegisterView: React.FC<RegisterViewProps> = ({
 
       {trashEntries.length > 0 && <Card className="border-rose-900/60"><CardContent className="p-4">
         <button type="button" className="flex w-full items-center justify-between text-sm font-semibold" onClick={() => setShowTrash((value) => !value)}>Cestino ({trashEntries.length})<span className="text-xs text-muted-foreground">{showTrash ? 'Nascondi' : 'Apri'}</span></button>
-        {showTrash && <div className="mt-2 divide-y divide-border">{trashEntries.map((entry) => <div key={entry.id} className="flex items-center justify-between py-2 text-xs"><span>{formatDateItalian(entry.date)} · {jobs.find((job) => job.id === entry.jobId)?.name ?? 'Lavoro'}</span><span className="flex gap-2"><button type="button" className="flex items-center gap-1 text-cyan-300" onClick={() => void onRestoreEntry(entry.id)}><RotateCcw className="h-3 w-3" /> Recupera</button><button type="button" className="text-rose-300" onClick={() => void onPermanentlyDeleteEntry(entry.id)}>Elimina</button></span></div>)}</div>}
+        {showTrash && <div className="mt-2 divide-y divide-border">{trashEntries.map((entry) => {
+          const job = jobs.find((item) => item.id === entry.jobId)
+          return <div key={entry.id} className="flex items-center justify-between py-2 text-xs">
+            <span>{formatDateItalian(entry.date)} · {job?.name ?? 'Lavoro'}</span>
+            <span className="flex gap-2">
+              <button type="button" className="flex items-center gap-1 text-cyan-300" onClick={() => setTrashConfirmation({ type: 'restore', entry })}><RotateCcw className="h-3 w-3" /> Recupera</button>
+              <button type="button" className="text-rose-300" onClick={() => setTrashConfirmation({ type: 'delete', entry })}>Elimina</button>
+            </span>
+          </div>
+        })}</div>}
       </CardContent></Card>}
 
       <Card><CardContent className="p-4"><div className="mb-3 flex items-center gap-2"><BriefcaseBusiness className="h-4 w-4 text-primary" /><h3 className="font-bold">Nuovo lavoro</h3></div><form onSubmit={createJob} className="space-y-2"><Input placeholder="Nome del lavoro" value={newJobName} onChange={(event) => setNewJobName(event.target.value)} required /><div className="grid grid-cols-2 gap-2"><Input placeholder="Cliente" value={newJobClient} onChange={(event) => setNewJobClient(event.target.value)} /><Input inputMode="decimal" type="number" min="0" step="0.5" placeholder="€/ora" value={newJobRate} onChange={(event) => setNewJobRate(event.target.value)} required /></div><label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={newJobOvertime} onChange={(event) => setNewJobOvertime(event.target.checked)} /> Straordinari maggiorati {newJobOvertime && <Input className="ml-auto h-9 w-20" inputMode="decimal" type="number" min="1" step="0.1" value={newJobMultiplier} onChange={(event) => setNewJobMultiplier(event.target.value)} />}</label><Button type="submit" className="w-full"><Plus className="mr-1 h-4 w-4" /> Crea lavoro</Button></form></CardContent></Card>
+
+      {trashConfirmation && (
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="trash-confirmation-title">
+          <Card className="w-full max-w-md animate-[view-enter_180ms_ease-out]">
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start gap-3">
+                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${trashConfirmation.type === 'delete' ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
+                  {trashConfirmation.type === 'delete' ? <Trash2 className="h-5 w-5" /> : <RotateCcw className="h-5 w-5" />}
+                </div>
+                <div>
+                  <h3 id="trash-confirmation-title" className="font-bold">
+                    {trashConfirmation.type === 'delete' ? 'Eliminare definitivamente?' : 'Recuperare questa attività?'}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {trashConfirmation.type === 'delete' ? 'L’attività verrà rimossa senza possibilità di recupero.' : 'L’attività tornerà tra le registrazioni attive.'}
+                  </p>
+                </div>
+              </div>
+              {(() => {
+                const job = jobs.find((item) => item.id === trashConfirmation.entry.jobId)
+                const amount = (trashConfirmation.entry.minutes / 60) * trashConfirmation.entry.rate + (trashConfirmation.entry.overtimeMinutes / 60) * (trashConfirmation.entry.overtimeRate || trashConfirmation.entry.rate)
+                return (
+                  <div className="rounded-2xl border border-border bg-background/60 p-3">
+                    <p className="text-sm font-bold">{job?.name ?? 'Lavoro'}{job?.client ? ` · ${job.client}` : ''}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDateItalian(trashConfirmation.entry.date)} · {trashConfirmation.entry.start}–{trashConfirmation.entry.end}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {formatDuration(trashConfirmation.entry.minutes)} lavorate{trashConfirmation.entry.overtimeMinutes ? ` + ${formatDuration(trashConfirmation.entry.overtimeMinutes)} extra` : ''}
+                    </p>
+                    {trashConfirmation.entry.note && <p className="mt-2 line-clamp-3 text-xs italic text-muted-foreground">{trashConfirmation.entry.note}</p>}
+                    <p className="mt-2 text-right text-base font-black text-success">{formatCurrency(amount)}</p>
+                  </div>
+                )
+              })()}
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" onClick={() => setTrashConfirmation(null)}>Annulla</Button>
+                <Button
+                  className={trashConfirmation.type === 'delete' ? 'bg-destructive text-white hover:bg-destructive/90' : ''}
+                  onClick={() => void confirmTrashAction()}
+                >
+                  {trashConfirmation.type === 'delete' ? 'Elimina' : 'Recupera'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }

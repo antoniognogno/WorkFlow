@@ -6,9 +6,9 @@ export interface WorkGoals {
 }
 
 export const defaultGoals: WorkGoals = {
-  monthlyHours: 160,
-  monthlyEarnings: 2000,
-  weeklyHours: 40,
+  monthlyHours: 50,
+  monthlyEarnings: 500,
+  weeklyHours: 12,
   jobMonthlyEarnings: {},
 }
 

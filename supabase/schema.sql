@@ -49,9 +49,9 @@ CREATE TABLE IF NOT EXISTS public.settings (
   template_row TEXT NOT NULL DEFAULT '{giorno} {data}: {da}–{a} ({ore} h) → {euro}',
   template_total TEXT NOT NULL DEFAULT 'Totale: {ore} h = {euro}',
   theme TEXT NOT NULL DEFAULT 'system',
-  monthly_hours_goal NUMERIC(8, 2) NOT NULL DEFAULT 160,
-  monthly_earnings_goal NUMERIC(10, 2) NOT NULL DEFAULT 2000,
-  weekly_hours_goal NUMERIC(8, 2) NOT NULL DEFAULT 40,
+  monthly_hours_goal NUMERIC(8, 2) NOT NULL DEFAULT 50,
+  monthly_earnings_goal NUMERIC(10, 2) NOT NULL DEFAULT 500,
+  weekly_hours_goal NUMERIC(8, 2) NOT NULL DEFAULT 12,
   job_monthly_earnings_goals JSONB NOT NULL DEFAULT '{}'::jsonb,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

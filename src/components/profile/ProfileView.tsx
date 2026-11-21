@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { UserRound, LogOut, Mail, Heart, BriefcaseBusiness, ClipboardList, ShieldCheck, Pencil, Check, Eye, EyeOff, KeyRound, ArrowLeft, ChevronRight, Target } from 'lucide-react'
 import type { Theme } from '@/App'
 import { Select } from '@/components/ui/select'
+import { formatCurrency } from '@/lib/utils'
 import type { WorkGoals } from '@/lib/goals'
 
 interface GoalJob {
@@ -37,6 +38,7 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
   const [changingPassword, setChangingPassword] = useState(false)
   const [confirmPassword, setConfirmPassword] = useState('')
   const [passwordView, setPasswordView] = useState(false)
+  const [goalsView, setGoalsView] = useState(false)
   const [goalDraft, setGoalDraft] = useState<WorkGoals>(goals)
   const [savingGoals, setSavingGoals] = useState(false)
 
@@ -129,6 +131,67 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
       </div>
     )
   }
+
+  if (goalsView) {
+    return (
+      <div className="view-enter space-y-4 pb-24">
+        <button type="button" onClick={() => setGoalsView(false)} className="flex items-center gap-2 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Profilo
+        </button>
+        <div>
+          <p className="text-sm text-muted-foreground">Dashboard mensile</p>
+          <h2 className="text-2xl font-black">I tuoi obiettivi</h2>
+        </div>
+        <Card>
+          <CardContent className="space-y-4 p-5">
+            <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3">
+              <Target className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <p className="text-xs leading-relaxed text-muted-foreground">Imposta i tuoi traguardi mensili e settimanali. La dashboard li aggiornerà automaticamente in base alle registrazioni.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-xs font-semibold text-muted-foreground">Ore mensili
+                <Input type="number" min="0" step="1" value={goalDraft.monthlyHours} onChange={(event) => setGoalDraft((current) => ({ ...current, monthlyHours: Number(event.target.value) }))} className="mt-2" />
+              </label>
+              <label className="text-xs font-semibold text-muted-foreground">Ore settimanali
+                <Input type="number" min="0" step="1" value={goalDraft.weeklyHours} onChange={(event) => setGoalDraft((current) => ({ ...current, weeklyHours: Number(event.target.value) }))} className="mt-2" />
+              </label>
+            </div>
+            <label className="block text-xs font-semibold text-muted-foreground">Guadagno mensile (€)
+              <Input type="number" min="0" step="50" value={goalDraft.monthlyEarnings} onChange={(event) => setGoalDraft((current) => ({ ...current, monthlyEarnings: Number(event.target.value) }))} className="mt-2" />
+            </label>
+            {jobs.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-muted-foreground">Obiettivo mensile per lavoro</p>
+                {jobs.map((job) => (
+                  <label key={job.id} className="block text-xs font-semibold text-muted-foreground">
+                    {job.name}{job.client ? ` · ${job.client}` : ''}
+                    <Input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={goalDraft.jobMonthlyEarnings[job.id] ?? ''}
+                      placeholder="€"
+                      onChange={(event) => setGoalDraft((current) => ({
+                        ...current,
+                        jobMonthlyEarnings: {
+                          ...current.jobMonthlyEarnings,
+                          [job.id]: Number(event.target.value),
+                        },
+                      }))}
+                      className="mt-2"
+                    />
+                  </label>
+                ))}
+              </div>
+            )}
+            <Button className="w-full" onClick={() => void saveGoals()} disabled={savingGoals}>
+              <Check className="mr-2 h-4 w-4" /> Salva obiettivi
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
   return (
     <div className="view-enter space-y-4 pb-24">
       <div>
@@ -176,54 +239,11 @@ export function ProfileView({ email, displayName, theme, onThemeChange, onSignOu
             <span className="flex-1"><span className="block text-sm font-semibold">Password</span><span className="block text-xs text-muted-foreground">Cambia la password dell’account</span></span>
             <ChevronRight className="h-4 w-4 text-muted-foreground" />
           </button>
-          <div className="space-y-3 rounded-2xl border border-border/80 bg-background/50 p-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></span>
-              <div>
-                <p className="text-sm font-semibold">Obiettivi</p>
-                <p className="text-xs text-muted-foreground">Ore e guadagni da raggiungere</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="text-xs text-muted-foreground">Ore mensili
-                <Input type="number" min="0" step="1" value={goalDraft.monthlyHours} onChange={(event) => setGoalDraft((current) => ({ ...current, monthlyHours: Number(event.target.value) }))} className="mt-1" />
-              </label>
-              <label className="text-xs text-muted-foreground">Ore settimanali
-                <Input type="number" min="0" step="1" value={goalDraft.weeklyHours} onChange={(event) => setGoalDraft((current) => ({ ...current, weeklyHours: Number(event.target.value) }))} className="mt-1" />
-              </label>
-            </div>
-            <label className="block text-xs text-muted-foreground">Guadagno mensile (€)
-              <Input type="number" min="0" step="50" value={goalDraft.monthlyEarnings} onChange={(event) => setGoalDraft((current) => ({ ...current, monthlyEarnings: Number(event.target.value) }))} className="mt-1" />
-            </label>
-            {jobs.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground">Obiettivo mensile per lavoro</p>
-                {jobs.map((job) => (
-                  <label key={job.id} className="block text-xs text-muted-foreground">
-                    {job.name}{job.client ? ` · ${job.client}` : ''}
-                    <Input
-                      type="number"
-                      min="0"
-                      step="50"
-                      value={goalDraft.jobMonthlyEarnings[job.id] ?? ''}
-                      placeholder="€"
-                      onChange={(event) => setGoalDraft((current) => ({
-                        ...current,
-                        jobMonthlyEarnings: {
-                          ...current.jobMonthlyEarnings,
-                          [job.id]: Number(event.target.value),
-                        },
-                      }))}
-                      className="mt-1"
-                    />
-                  </label>
-                ))}
-              </div>
-            )}
-            <Button className="w-full" onClick={() => void saveGoals()} disabled={savingGoals}>
-              <Check className="mr-2 h-4 w-4" /> Salva obiettivi
-            </Button>
-          </div>
+          <button type="button" onClick={() => setGoalsView(true)} className="flex w-full items-center gap-3 rounded-2xl border border-border/80 bg-background/50 p-3 text-left transition-colors hover:border-primary/40 hover:bg-surface-raised">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10 text-primary"><Target className="h-4 w-4" /></span>
+            <span className="flex-1"><span className="block text-sm font-semibold">Obiettivi</span><span className="block text-xs text-muted-foreground">{goalDraft.monthlyHours} ore · {formatCurrency(goalDraft.monthlyEarnings)} al mese</span></span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </button>
           <Button variant="outline" className="w-full" onClick={onSignOut}>
             <LogOut className="mr-2 h-4 w-4" /> Esci dall’account
           </Button>
